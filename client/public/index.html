@@ -5,30 +5,67 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>CV Project MVP</title>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #121212; color: white; }
-        .container { max-width: 800px; width: 100%; padding: 20px; }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #121212; color: white; margin: 0; }
+        .container { max-width: 800px; width: 100%; padding: 20px; box-sizing: border-box; }
         .controls { margin-bottom: 20px; display: flex; gap: 10px; }
         input { padding: 8px; flex-grow: 1; border-radius: 4px; border: 1px solid #444; background: #222; color: white; }
-        button { padding: 8px 16px; border-radius: 4px; border: none; background: #007bff; color: white; cursor: pointer; }
+        button { padding: 8px 16px; border-radius: 4px; border: none; background: #007bff; color: white; cursor: pointer; font-weight: bold; }
         button:disabled { background: #444; }
-        .vis-container { position: relative; width: 100%; display: flex; flex-direction: column; gap: 10px; }
-        video, img { width: 100%; border-radius: 8px; background: #000; }
-        .guidance-overlay { font-size: 1.5rem; text-align: center; color: #32c8ff; font-weight: bold; }
+        
+        .vis-container { 
+            position: relative; 
+            width: 100%; 
+            aspect-ratio: 4/3;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        #webcam { 
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%; 
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+        }
+        
+        #overlay { 
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%; 
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+            object-fit: cover;
+        }
+
+        .guidance-overlay { 
+            margin-top: 15px;
+            font-size: 1.5rem; 
+            text-align: center; 
+            color: #32c8ff; 
+            font-weight: bold; 
+            min-height: 2rem;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Object Finder MVP</h1>
+        <h1>Object Finder Live Overlay</h1>
         <div class="controls">
-            <input type="text" id="promptInput" placeholder="Z. B. 'Löffel' oder 'rote Kerze'" value="spoon">
+            <input type="text" id="promptInput" placeholder="Z. B. 'Löffel'" value="spoon">
             <button id="toggleBtn">Start Kamera</button>
         </div>
         <div class="vis-container">
-            <div id="guidanceText" class="guidance-overlay">Guidance: -</div>
-            <video id="webcam" autoplay playsinline muted style="display:none;"></video>
-            <img id="output" alt="Processed output">
-            <canvas id="canvas" style="display:none;"></canvas>
+            <video id="webcam" autoplay playsinline muted></video>
+            <canvas id="overlay"></canvas>
+            <!-- Offscreen canvas for capturing frames -->
+            <canvas id="captureCanvas" style="display:none;"></canvas>
         </div>
+        <div id="guidanceText" class="guidance-overlay">Warte auf Kamera...</div>
     </div>
     <script type="module" src="/client/src/main.js"></script>
 </body>
