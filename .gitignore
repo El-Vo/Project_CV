@@ -1,1 +1,4 @@
 .cvenv/
+**/__pycache__/*
+reading/*
+.github/copilot-instructions.md
