@@ -38,40 +38,39 @@ async def detect_object(prompt: str = Form(...), file: UploadFile = File(...)):
         detections = []
         from ..utils.vision import pick_top_box, classify_distance, classify_direction
         
-        boxes = results.boxes.xyxy.cpu().numpy() if results.boxes is not None else None
-        scores = results.boxes.conf.cpu().numpy() if results.boxes is not None else None
-        cls_ids = results.boxes.cls.cpu().numpy() if results.boxes is not None else None
-        names = results.names
-
-        idx = pick_top_box(boxes, scores) if boxes is not None else None
-        
         guidance = ''
-        if idx is not None:
-            box = boxes[idx]
-            score = float(scores[idx])
-            cls_id = int(cls_ids[idx]) if cls_ids is not None else -1
-            
-            if isinstance(names, dict):
-                label = names.get(cls_id, prompt)
-            elif isinstance(names, list) and cls_id < len(names):
-                label = names[cls_id]
-            else:
-                label = prompt
-            
-            dist = classify_distance(box, frame.shape)
-            direction = classify_direction(box, frame.shape)
-            guidance = f'{direction}, {dist}'
-            
-            detections.append({
-                'label': label,
-                'confidence': score,
-                'box': box.tolist(),
-                'guidance': guidance
-            })
+        if results.boxes is not None and len(results.boxes) > 0:
+            boxes = results.boxes.xyxy.cpu().numpy()
+            scores = results.boxes.conf.cpu().numpy()
+            cls_ids = results.boxes.cls.cpu().numpy()
+            names = results.names
+
+            # Process all detections
+            for i in range(len(boxes)):
+                box = boxes[i].tolist()  # Converts to list of Python floats
+                score = float(scores[i])
+                cls_id = int(cls_ids[i])
+                
+                label = names.get(cls_id, prompt) if isinstance(names, dict) else prompt
+                
+                detections.append({
+                    'label': str(label),
+                    'confidence': score,
+                    'box': [float(x) for x in box],  # Extra safety
+                    'guidance': ''
+                })
+
+            # Top box guidance
+            idx = pick_top_box(boxes, scores)
+            if idx is not None:
+                dist = classify_distance(boxes[idx], frame.shape)
+                direction = classify_direction(boxes[idx], frame.shape)
+                guidance = f'{direction}, {dist}'
+                detections[idx]['guidance'] = guidance
 
         return {
             'status': 'success',
-            'prompt': prompt,
+            'prompt': str(prompt),
             'detections': detections,
             'guidance': guidance
         }
