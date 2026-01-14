@@ -88,3 +88,10 @@ async def serve_home():
     if index_path and os.path.exists(index_path):
         return FileResponse(index_path)
     return {'error': 'Index file not found'}
+
+@app.get('/ar.html')
+async def serve_ar():
+    ar_path = os.path.join(client_path, 'public', 'ar.html')
+    if ar_path and os.path.exists(ar_path):
+        return FileResponse(ar_path)
+    return {'error': 'AR file not found'}
