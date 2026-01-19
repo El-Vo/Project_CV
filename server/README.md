@@ -1,11 +1,11 @@
 # Server / API Helpers
 
-Dieser Server stellt ausschließlich die API für die Objekterkennung bereit.
+This server provides only the API for object detection.
 
-## API Endpunkte
-- `POST /detect`: Nimmt ein Bild und einen Prompt entgegen und gibt die Erkennungsergebnisse zurück.
+## API Endpoints
+- `POST /detect`: Accepts an image and a prompt and returns the detection results.
 
-## Ausführung
+## Execution
 ```bash
 uvicorn server.api.app:app --host 0.0.0.0 --port 8000 --reload
 ```

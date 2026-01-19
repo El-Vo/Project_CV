@@ -2,16 +2,16 @@
 
 Browser-first UI for camera-based open-vocabulary guidance.
 
-## Lokale Ausführung
-Um den Client lokal auszuführen, starte einen Webserver im `client`-Ordner:
+## Local Execution
+To run the client locally, start a web server in the `client` folder:
 
 ```bash
 cd client
 python3 -m http.server 3000
 ```
-Dann öffne `http://localhost:3000/public/index.html` im Browser.
+Then open `http://localhost:3000/public/index.html` in your browser.
 
 ## Folders
-- `public/`: Statische Dateien (`index.html`, `style.css`, etc.).
-- `src/`: UI-Logik ([main.js](../src/main.js), [ar.js](../src/ar.js)).
-- `assets/`: Schriftarten, Formen, Mock-Daten.
+- `public/`: Static files (`index.html`, `style.css`, etc.).
+- `src/`: UI logic ([main.js](../src/main.js), [ar.js](../src/ar.js)).
+- `assets/`: Fonts, shapes, mock data.

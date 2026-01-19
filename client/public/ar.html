@@ -1,29 +1,22 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Distanzmessung</title>
+    <title>AR Distance Measurement</title>
     <link rel="stylesheet" href="ar.css">
-    <!-- Import Map für Three.js -->
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-            }
-        }
-    </script>
 </head>
 <body>
+    <div class="video-container">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="depth-canvas"></canvas>
+        <div id="crosshair"></div>
+    </div>
+
     <div id="overlay">
-        Status: Bereit<br>
-        Distanz: <span id="distance">--</span> m
+        Rel. Depth: <span id="distance">--</span>
     </div>
     
-    <!-- AR Start Button -->
-    <button id="ar-button">AR Starten</button>
-
     <script type="module" src="../src/ar.js"></script>
 </body>
 </html>

@@ -17,7 +17,7 @@ const MAX_HISTORY = 5;
 const MOVEMENT_THRESHOLD = 15; // Pixels of average center movement
 
 async function startCamera() {
-    console.log("Versuche Kamera zu starten...");
+    console.log("Attempting to start camera...");
     try {
         stream = await navigator.mediaDevices.getUserMedia({ 
             video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "environment" } 
@@ -26,7 +26,7 @@ async function startCamera() {
         video.onloadedmetadata = () => {
             video.play().catch(e => console.error("Video play failed:", e));
             isCameraRunning = true;
-            toggleCamBtn.innerText = 'Kamera stoppen';
+            toggleCamBtn.innerText = 'Stop camera';
             toggleDetBtn.disabled = false;
             
             overlay.width = video.videoWidth;
@@ -38,11 +38,11 @@ async function startCamera() {
         };
     } catch (err) {
         console.error("Error accessing webcam:", err);
-        guidanceText.innerText = `Fehler: ${err.name} - ${err.message}`;
+        guidanceText.innerText = `Error: ${err.name} - ${err.message}`;
         if (location.protocol === 'file:') {
-            guidanceText.innerText += " (Lokale Dateien blockieren Browser-Funktionen. Nutze einen Webserver!)";
+            guidanceText.innerText += " (Local files block browser functions. Use a web server!)";
         }
-        alert("Kamera konnte nicht gestartet werden. Details in der Konsole.");
+        alert("Camera could not be started. See console for details.");
     }
 }
 
@@ -52,10 +52,10 @@ function stopCamera() {
     }
     isCameraRunning = false;
     isDetectionRunning = false;
-    toggleCamBtn.innerText = 'Kamera starten';
-    toggleDetBtn.innerText = 'Erkennung starten';
+    toggleCamBtn.innerText = 'Start camera';
+    toggleDetBtn.innerText = 'Start detection';
     toggleDetBtn.disabled = true;
-    guidanceText.innerText = 'Kamera gestoppt.';
+    guidanceText.innerText = 'Camera stopped.';
     clearOverlay();
 }
 
@@ -105,7 +105,7 @@ function isMoving(newBox) {
         totalDist += d;
     }
     const avgDist = totalDist / (boxHistory.length - 1);
-    console.log("Durchschnittliche Bewegung:", avgDist.toFixed(2));
+    console.log("Average movement:", avgDist.toFixed(2));
     
     return avgDist > MOVEMENT_THRESHOLD;
 }
@@ -117,7 +117,7 @@ async function processLoop() {
     
     // Condition 2: Pause if prompt is empty
     if (isDetectionRunning && !prompt) {
-        guidanceText.innerText = "Pausiere (Kein Prompt)";
+        guidanceText.innerText = "Pausing (no prompt)";
         setTimeout(processLoop, 500);
         return;
     }
@@ -143,7 +143,7 @@ async function processLoop() {
                         
                         // Condition 3: Check movement
                         if (topBox && !isMoving(topBox)) {
-                            guidanceText.innerText = "Pausiert (Objekt stabil)";
+                            guidanceText.innerText = "Paused (object stable)";
                             // In a real app we might wait longer, here we keep looping but skip API until moved?
                             // To know if it moved, we'd need another detection. 
                             // Workaround: We wait longer (2 seconds) if stable
@@ -151,7 +151,7 @@ async function processLoop() {
                             return;
                         }
                         
-                        guidanceText.innerText = data.guidance || `Suche nach: ${prompt}`;
+                        guidanceText.innerText = data.guidance || `Searching for: ${prompt}`;
                     }
                 } catch (err) {
                     console.error("API error:", err);
@@ -170,12 +170,12 @@ toggleCamBtn.addEventListener('click', () => {
 
 toggleDetBtn.addEventListener('click', () => {
     isDetectionRunning = !isDetectionRunning;
-    toggleDetBtn.innerText = isDetectionRunning ? 'Erkennung stoppen' : 'Erkennung starten';
+    toggleDetBtn.innerText = isDetectionRunning ? 'Stop detection' : 'Start detection';
     if (isDetectionRunning) {
         boxHistory = []; // Reset history
-        guidanceText.innerText = 'Erkennung gestartet...';
+        guidanceText.innerText = 'Detection started...';
     } else {
         clearOverlay();
-        guidanceText.innerText = 'Erkennung pausiert.';
+        guidanceText.innerText = 'Detection paused.';
     }
 });
