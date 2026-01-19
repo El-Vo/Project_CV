@@ -1,28 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>CV Project MVP</title>
-    <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Distance Measurement</title>
+    <link rel="stylesheet" href="ar.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Object Finder Live Overlay</h1>
-        <div class="controls">
-            <input type="text" id="promptInput" placeholder="e.g. spoon'" value="spoon">
-            <button id="toggleCamBtn">Start camera</button>
-            <button id="toggleDetBtn" disabled>Start detection</button>
-            <a href="ar.html" style="margin-left: 10px; color: #32c8ff; text-decoration: none; border: 1px solid #32c8ff; padding: 5px 10px; border-radius: 4px; display: flex; align-items: center;">AR &rarr;</a>
-        </div>
-        <div class="vis-container">
-            <video id="webcam" autoplay playsinline muted></video>
-            <canvas id="overlay"></canvas>
-            <!-- Offscreen canvas for capturing frames -->
-            <canvas id="captureCanvas" style="display:none;"></canvas>
-        </div>
-        <div id="guidanceText" class="guidance-overlay">Waiting for camera...</div>
+    <div class="video-container">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="depth-canvas"></canvas>
+        <canvas id="detection-overlay"></canvas>
+        <div id="crosshair"></div>
     </div>
-    <script type="module" src="../src/main.js"></script>
+
+    <div id="overlay">
+        Rel. Depth: <span id="distance">--</span>
+    </div>
+
+    <div id="controls-bottom">
+        <input type="text" id="promptInput" placeholder="Enter object to find..." value="spoon">
+        <button id="toggleDetBtn">Start Detection</button>
+    </div>
+    
+    <!-- Offscreen canvas for capturing frames for detection -->
+    <canvas id="captureCanvas" style="display:none;"></canvas>
+    
+    <script type="module" src="../src/ar.js"></script>
 </body>
 </html>
