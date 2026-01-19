@@ -1,0 +1,45 @@
+export const UI = {
+    clearCanvas(ctx, canvas) {
+        if (ctx && canvas) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    },
+
+    drawDetection(ctx, canvas, det, sw, sh) {
+        if (!ctx || !canvas || !det) return;
+        this.clearCanvas(ctx, canvas);
+
+        const [x1, y1, x2, y2] = det.box;
+        const scaleX = canvas.width / sw;
+        const scaleY = canvas.height / sh;
+
+        const rx = x1 * scaleX;
+        const ry = y1 * scaleY;
+        const rw = (x2 - x1) * scaleX;
+        const rh = (y2 - y1) * scaleY;
+
+        ctx.strokeStyle = '#32c8ff';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(rx, ry, rw, rh);
+        
+        ctx.fillStyle = '#32c8ff';
+        const label = `${det.label} (${Math.round(det.confidence * 100)}%)`;
+        ctx.font = 'bold 18px Arial';
+        ctx.fillRect(rx, ry - 25, ctx.measureText(label).width + 10, 25);
+        ctx.fillStyle = 'black';
+        ctx.fillText(label, rx + 5, ry - 7);
+    },
+
+    updateCrosshair(el, center) {
+        if (!el) return;
+        if (center) {
+            el.style.left = `${center.x * 100}%`;
+            el.style.top = `${center.y * 100}%`;
+            el.style.borderColor = '#ff3232';
+        } else {
+            el.style.left = '50%';
+            el.style.top = '50%';
+            el.style.borderColor = '#32c8ff';
+        }
+    }
+};
