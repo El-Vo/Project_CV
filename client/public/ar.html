@@ -4,35 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR Distanzmessung</title>
-    <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        #overlay {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: white;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 16px;
-            pointer-events: none;
-        }
-        #ar-button {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 12px 24px;
-            background: #32c8ff;
-            border: none;
-            border-radius: 24px;
-            color: white;
-            font-weight: bold;
-            font-size: 16px;
-            display: block;
-            z-index: 999;
-        }
-    </style>
+    <link rel="stylesheet" href="ar.css">
     <!-- Import Map für Three.js -->
     <script type="importmap">
         {
@@ -52,6 +24,6 @@
     <!-- AR Start Button -->
     <button id="ar-button">AR Starten</button>
 
-    <script type="module" src="/client/src/ar.js"></script>
+    <script type="module" src="../src/ar.js"></script>
 </body>
 </html>

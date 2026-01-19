@@ -9,7 +9,7 @@ const guidanceText = document.getElementById('guidanceText');
 let isCameraRunning = false;
 let isDetectionRunning = false;
 let stream = null;
-const API_URL = '/detect';
+const API_URL = 'http://localhost:8000/detect';
 
 // Buffer for the last 5 bounding boxes
 let boxHistory = [];
@@ -38,7 +38,11 @@ async function startCamera() {
         };
     } catch (err) {
         console.error("Error accessing webcam:", err);
-        alert("Kamera konnte nicht gestartet werden.");
+        guidanceText.innerText = `Fehler: ${err.name} - ${err.message}`;
+        if (location.protocol === 'file:') {
+            guidanceText.innerText += " (Lokale Dateien blockieren Browser-Funktionen. Nutze einen Webserver!)";
+        }
+        alert("Kamera konnte nicht gestartet werden. Details in der Konsole.");
     }
 }
 

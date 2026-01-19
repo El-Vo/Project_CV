@@ -1,7 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 import cv2
 import numpy as np
 import io
@@ -20,9 +18,6 @@ app.add_middleware(
 )
 
 detector = ObjectDetector(model_path='models/yolov8s-world.pt')
-
-base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-client_path = os.path.join(base_path, 'client')
 
 @app.post('/detect')
 async def detect_object(prompt: str = Form(...), file: UploadFile = File(...)):
@@ -78,19 +73,3 @@ async def detect_object(prompt: str = Form(...), file: UploadFile = File(...)):
         import traceback
         traceback.print_exc()
         return {'status': 'error', 'message': str(e)}
-
-app.mount('/client', StaticFiles(directory=client_path), name='client')
-
-@app.get('/')
-async def serve_home():
-    index_path = os.path.join(client_path, 'public', 'index.html')
-    if index_path and os.path.exists(index_path):
-        return FileResponse(index_path)
-    return {'error': 'Index file not found'}
-
-@app.get('/ar.html')
-async def serve_ar():
-    ar_path = os.path.join(client_path, 'public', 'ar.html')
-    if ar_path and os.path.exists(ar_path):
-        return FileResponse(ar_path)
-    return {'error': 'AR file not found'}
