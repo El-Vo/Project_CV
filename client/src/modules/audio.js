@@ -46,7 +46,10 @@ export class ParkingSensor {
 
         let delay = CONFIG.AUDIO_MAX_DELAY;
         if (this.hasTarget) {
-            const normalized = Math.max(0, Math.min(1, this.currentDistance));
+            // Scale distance (assuming 0-255 range) to delay range
+            // 255 (Near) -> Min Delay (Fast)
+            // 0 (Far) -> Max Delay (Slow)
+            const normalized = Math.max(0, Math.min(255, this.currentDistance)) / 255;
             delay = CONFIG.AUDIO_MAX_DELAY - (normalized * (CONFIG.AUDIO_MAX_DELAY - CONFIG.AUDIO_MIN_DELAY));
         }
 
