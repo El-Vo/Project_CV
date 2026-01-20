@@ -6,3 +6,4 @@ torch>=2.2.0
 fastapi
 python-multipart
 uvicorn
+opencv-python
