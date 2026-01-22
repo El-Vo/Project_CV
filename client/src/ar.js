@@ -25,12 +25,17 @@ let isDetectionRunning = false;
 let currentObjectCenter = null;
 let currentDepthData = null;
 
+// FPS Tracking
+let lastDepthTime = performance.now();
+let lastDetTime = performance.now();
+let depthFPS = 0;
+let detFPS = 0;
+let lastUIPdateTime = 0;
+
 // Contexts
 const depthCtx = depthCanvas?.getContext('2d');
 const detCtx = detCanvas?.getContext('2d');
 const captureCtx = captureCanvas?.getContext('2d');
-const offscreenCanvas = document.createElement('canvas');
-const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
 
 async function init() {
     // Setup UI listeners
@@ -70,6 +75,7 @@ function toggleDetection() {
     } else {
         sensor.stop();
         currentObjectCenter = null;
+        detFPS = 0;
         UI.clearCanvas(detCtx, detCanvas);
         UI.updateCrosshair(crosshairEl, null);
     }
@@ -82,23 +88,32 @@ async function detectionLoop() {
         const prompt = promptInput?.value.trim();
         if (!prompt) return setTimeout(detectionLoop, 500);
 
-        const { sx, sy, sw, sh, targetWidth, targetHeight } = camera.getCrop(CONFIG.DETECTION_RES);
-        captureCanvas.width = targetWidth;
-        captureCanvas.height = targetHeight;
-        captureCtx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
+        const region = camera.visibleRegion;
+        captureCanvas.width = region.width;
+        captureCanvas.height = region.height;
+        captureCtx.drawImage(
+            videoEl, 
+            region.x, region.y, region.width, region.height,
+            0, 0, region.width, region.height
+        );
 
         const data = await detectObjects(captureCanvas, prompt);
+
+        // Update detection FPS
+        const now = performance.now();
+        detFPS = 1000 / (now - lastDetTime);
+        lastDetTime = now;
 
         if (data?.status === 'success' && data.detections?.length > 0) {
             const topDet = data.detections[0];
             const [x1, y1, x2, y2] = topDet.box;
             
             currentObjectCenter = {
-                x: ((x1 + x2) / 2) / targetWidth,
-                y: ((y1 + y2) / 2) / targetHeight
+                x: ((x1 + x2) / 2) / region.width,
+                y: ((y1 + y2) / 2) / region.height
             };
 
-            UI.drawDetection(detCtx, detCanvas, topDet, targetWidth, targetHeight);
+            UI.drawDetection(detCtx, detCanvas, topDet, region.width, region.height);
         } else {
             currentObjectCenter = null;
             UI.clearCanvas(detCtx, detCanvas);
@@ -116,44 +131,58 @@ async function renderLoop() {
     try {
         if (videoEl.readyState < 2) return requestAnimationFrame(renderLoop);
 
+        const now = performance.now();
+        const interval = 1000 / CONFIG.DEPTH_FPS;
+
         // Optimization: Only run depth if object detected
-        if (!currentObjectCenter) {
+        /* if (!currentObjectCenter) {
             UI.clearCanvas(depthCtx, depthCanvas);
             UI.updateCrosshair(crosshairEl, null);
             if (distanceEl) distanceEl.innerText = "--";
             sensor.update(0, false);
             return requestAnimationFrame(renderLoop);
+        } */
+
+        if (now - lastDepthTime >= interval) {
+            const depthPrediction = await depth.predict(videoEl, camera.visibleRegion);
+            if (depthPrediction) {
+                // Update depth FPS
+                depthFPS = 1000 / (now - lastDepthTime);
+                lastDepthTime = now;
+
+                currentDepthData = depthPrediction.data;
+                const { width, height } = depthPrediction;
+                
+                // Draw visual depth map
+                if (depthCanvas) {
+                    const visualCanvas = await depthPrediction.toCanvas();
+                    if (depthCanvas.width !== visualCanvas.width || depthCanvas.height !== visualCanvas.height) {
+                        depthCanvas.width = visualCanvas.width;
+                        depthCanvas.height = visualCanvas.height;
+                    }
+                    depthCtx.drawImage(visualCanvas, 0, 0);
+                }
+
+                // Update distance and sensor
+                if (currentObjectCenter) {
+                    const tx = Math.floor(currentObjectCenter.x * width);
+                    const ty = Math.floor(currentObjectCenter.y * height);
+                    const idx = Math.max(0, Math.min(width * height - 1, ty * width + tx));
+                    const val = currentDepthData[idx];
+
+                    if (distanceEl) distanceEl.innerText = val.toFixed(3);
+                    sensor.update(val, true);
+                    UI.updateCrosshair(crosshairEl, currentObjectCenter);
+                } else {
+                    sensor.update(0, false);
+                }
+            }
         }
 
-        const { sx, sy, sw, sh, targetWidth, targetHeight } = camera.getCrop(CONFIG.DEPTH_RES);
-        offscreenCanvas.width = targetWidth;
-        offscreenCanvas.height = targetHeight;
-        offscreenCtx.drawImage(videoEl, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight);
-
-        const depthPrediction = await depth.predict(offscreenCanvas);
-        if (depthPrediction) {
-            currentDepthData = depthPrediction.data;
-            const { width, height } = depthPrediction;
-            
-            // Draw visual depth map
-            if (depthCanvas) {
-                const visualCanvas = await depthPrediction.toCanvas();
-                if (depthCanvas.width !== visualCanvas.width || depthCanvas.height !== visualCanvas.height) {
-                    depthCanvas.width = visualCanvas.width;
-                    depthCanvas.height = visualCanvas.height;
-                }
-                depthCtx.drawImage(visualCanvas, 0, 0);
-            }
-
-            // Update distance and sensor
-            const tx = Math.floor(currentObjectCenter.x * width);
-            const ty = Math.floor(currentObjectCenter.y * height);
-            const idx = Math.max(0, Math.min(width * height - 1, ty * width + tx));
-            const val = currentDepthData[idx];
-
-            if (distanceEl) distanceEl.innerText = val.toFixed(3);
-            sensor.update(val, true);
-            UI.updateCrosshair(crosshairEl, currentObjectCenter);
+        // Periodically update UI stats
+        if (now - lastUIPdateTime > 500) {
+            UI.updateFPS(depthFPS, detFPS);
+            lastUIPdateTime = now;
         }
 
     } catch (err) {

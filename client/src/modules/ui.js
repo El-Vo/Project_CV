@@ -41,5 +41,12 @@ export const UI = {
             el.style.top = '50%';
             el.style.borderColor = '#32c8ff';
         }
+    },
+
+    updateFPS(depthFPS, detFPS) {
+        const depthEl = document.getElementById('depth-fps');
+        const detEl = document.getElementById('det-fps');
+        if (depthEl) depthEl.innerText = depthFPS.toFixed(1);
+        if (detEl) detEl.innerText = detFPS.toFixed(1);
     }
 };
