@@ -45,6 +45,8 @@ async function init() {
     toggleDetBtn?.addEventListener('click', toggleDetection);
     window.addEventListener('resize', () => resizeDetectionOverlay());
 
+    resizeDetectionOverlay();
+
     if (CONFIG.LOCAL_MODE) {
         if (toggleDetBtn) toggleDetBtn.style.display = 'none';
         if (promptInput) promptInput.style.display = 'none';
@@ -53,8 +55,6 @@ async function init() {
             detCanvas.style.zIndex = '15'; // Ensure it's above the video but below controls
         }
         isDetectionRunning = true; // Always allow tap in local mode
-        sensor.init();
-        sensor.start();
     }
 
     // Local mode initialization via tap
@@ -89,6 +89,8 @@ async function init() {
             isTrackingActive = true;
             currentObjectCenter = { x: rx / region.width, y: ry / region.height };
             console.log("Local Mode: Tracker successfully initialized at", rx, ry);
+            sensor.init();
+            sensor.start();
             
             // Immediate feedback: manual draw
             UI.drawDetection(detCtx, detCanvas, {
@@ -101,11 +103,22 @@ async function init() {
         }
     });
 
+    // Start Loops immediately to allow UI updates/tracking
+    renderLoop();
+    if (!CONFIG.LOCAL_MODE) {
+        detectionLoop();
+    }
+    trackingLoop();
+
     // Initialize services
     const cameraOk = await camera.start();
     if (!cameraOk) return;
 
-    await depth.init();
+    isRunning = true;
+    console.log("Basic services ready, loading depth model...");
+
+
+    depth.init();
     
     // Improved OpenCV loading check
     if (typeof cv !== 'undefined') {
@@ -118,17 +131,7 @@ async function init() {
         }
     }
 
-    isRunning = true;
-    resizeDetectionOverlay();
-    
-    console.log("App initialized, starting loops...");
-    
-    // Start Loops
-    renderLoop();
-    if (!CONFIG.LOCAL_MODE) {
-        detectionLoop();
-    }
-    trackingLoop();
+    console.log("App initialization sequence complete.");
 }
 
 function resizeDetectionOverlay() {
@@ -216,40 +219,45 @@ async function detectionLoop() {
 async function trackingLoop() {
     if (!isRunning) return requestAnimationFrame(trackingLoop);
 
-    if (isTrackingActive && videoEl.readyState >= 2) {
-        const now = performance.now();
-        const region = camera.visibleRegion;
+    try {
+        if (isTrackingActive && videoEl.readyState >= 2) {
+            const now = performance.now();
+            const region = camera.visibleRegion;
 
-        const trackResult = tracker.track(videoEl, region);
-        
-        if (trackResult) {
-            const [x1, y1, x2, y2] = trackResult.box;
+            const trackResult = tracker.track(videoEl, region);
             
-            currentObjectCenter = {
-                x: (x1 + x2) / 2 / region.width,
-                y: (y1 + y2) / 2 / region.height
-            };
+            if (trackResult) {
+                const [x1, y1, x2, y2] = trackResult.box;
+                
+                currentObjectCenter = {
+                    x: (x1 + x2) / 2 / region.width,
+                    y: (y1 + y2) / 2 / region.height
+                };
 
-            UI.drawDetection(detCtx, detCanvas, {
-                label: 'Tracking...',
-                confidence: trackResult.confidence,
-                box: [x1, y1, x2, y2]
-            }, region.width, region.height);
+                UI.drawDetection(detCtx, detCanvas, {
+                    label: 'Tracking...',
+                    confidence: trackResult.confidence,
+                    box: [x1, y1, x2, y2]
+                }, region.width, region.height);
 
-            detFPS = 1000 / (now - lastDetTime);
-            lastDetTime = now;
-        } else {
-            isTrackingActive = false;
-            currentObjectCenter = null;
-            UI.clearCanvas(detCtx, detCanvas);
+                detFPS = 1000 / (now - lastDetTime);
+                lastDetTime = now;
+            } else {
+                console.log("Tracker lost object");
+                isTrackingActive = false;
+                currentObjectCenter = null;
+                UI.clearCanvas(detCtx, detCanvas);
+            }
         }
+    } catch (err) {
+        console.error("Tracking loop error:", err);
     }
 
     requestAnimationFrame(trackingLoop);
 }
 
 async function renderLoop() {
-    if (!isRunning) return;
+    if (!isRunning) return requestAnimationFrame(renderLoop);
 
     try {
         if (videoEl.readyState < 2) return requestAnimationFrame(renderLoop);
@@ -278,7 +286,7 @@ async function renderLoop() {
                 const { width, height } = depthPrediction;
                 
                 // Draw visual depth map
-                if (depthCanvas) {
+                if (depthCanvas && depthPrediction.toCanvas) {
                     const visualCanvas = await depthPrediction.toCanvas();
                     if (depthCanvas.width !== visualCanvas.width || depthCanvas.height !== visualCanvas.height) {
                         depthCanvas.width = visualCanvas.width;

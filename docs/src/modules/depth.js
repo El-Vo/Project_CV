@@ -12,20 +12,33 @@ export class DepthEstimator {
     }
 
     async init() {
+        console.log("Initializing Depth Estimator with model:", this.modelId);
+        
+        // Optimize for browser environment
+        env.backends.onnx.wasm.numThreads = 1; // Prevent issues with missing COOP/COEP headers
+        
         try {
             this.estimator = await pipeline('depth-estimation', this.modelId, {
                 device: 'webgpu',
             });
             console.log("Depth Anything V2 loaded on WebGPU");
-            
-            // Create internal offscreen canvas for frame capture
+        } catch (err) {
+            console.warn("WebGPU failed, falling back to WASM with quantization:", err);
+            try {
+                // Using q8 (8-bit quantization) is much more stable and faster for WASM
+                this.estimator = await pipeline('depth-estimation', this.modelId, {
+                    device: 'wasm',
+                    dtype: 'q8', 
+                });
+                console.log("Depth Anything V2 loaded on WASM (q8)");
+            } catch (wasmErr) {
+                console.error("Critical: Depth estimation failed to load entirely:", wasmErr);
+                this.estimator = null; 
+            }
+        } finally {
+            // Ensure canvas is created even if estimator fails
             this.canvas = new OffscreenCanvas(1, 1);
             this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
-        } catch (err) {
-            console.warn("WebGPU failed, falling back to WASM:", err);
-            this.estimator = await pipeline('depth-estimation', this.modelId, {
-                device: 'wasm',
-            });
         }
     }
 
