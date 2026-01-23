@@ -12,7 +12,7 @@ export class DepthEstimator {
     }
 
     async init() {
-        console.log("Initializing Depth Estimator (Ultra-Stable Mode)...");
+        console.log("Initializing Depth Estimator...");
         
         // Initializing canvas early to avoid null-pointer errors in predict()
         this.canvas = new OffscreenCanvas(1, 1);
@@ -29,22 +29,35 @@ export class DepthEstimator {
         
         let usedBackend = 'unknown';
 
+        // Try backends in order: WebGPU (GPU) -> WebNN (NPU) -> WASM (CPU)
         try {
-                console.log("Attempting WebGPU...");
-                this.estimator = await pipeline('depth-estimation', this.modelId, { 
-                    device: 'webgpu'
-                });
-                usedBackend = 'WebGPU';
-        } catch (e) {
-            console.log("WebGPU skipped/failed. Initializing WASM Fallback...");
+            console.log("Attempting WebGPU...");
+            this.estimator = await pipeline('depth-estimation', this.modelId, { 
+                device: 'webgpu'
+            });
+            usedBackend = 'WebGPU';
+        } catch (gpuErr) {
+            console.log("WebGPU skipped/failed:", gpuErr.message || gpuErr);
             try {
+                // WebNN Attempt (Experimental)
+                console.log("Attempting WebNN...");
                 this.estimator = await pipeline('depth-estimation', this.modelId, { 
-                    device: 'wasm',
-                    dtype: 'q8'
+                    device: 'webnn',
+                    dtype: 'fp32'
                 });
-                usedBackend = 'WASM';
-            } catch (wasmErr) {
-                console.error("BindingError persists? Memory limit might be reached:", wasmErr.message || wasmErr);
+                usedBackend = 'WebNN';
+            } catch (webnnErr) {
+                console.log("WebNN skipped/failed:", webnnErr.message || webnnErr);
+                try {
+                    console.log("Initializing WASM Fallback...");
+                    this.estimator = await pipeline('depth-estimation', this.modelId, { 
+                        device: 'wasm',
+                        dtype: 'q8'
+                    });
+                    usedBackend = 'WASM';
+                } catch (wasmErr) {
+                    console.error("Critical: Fallback failed:", wasmErr.message || wasmErr);
+                }
             }
         }
 
@@ -52,7 +65,7 @@ export class DepthEstimator {
             console.log(`Status: Depth Estimator Ready (${usedBackend}).`);
             
             const infoEl = document.getElementById('backend-info');
-            if (infoEl) infoEl.innerText = `${usedBackend}`;
+            if (infoEl) infoEl.innerText = usedBackend;
         }
     }
 
