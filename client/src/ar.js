@@ -45,6 +45,62 @@ async function init() {
     toggleDetBtn?.addEventListener('click', toggleDetection);
     window.addEventListener('resize', () => resizeDetectionOverlay());
 
+    if (CONFIG.LOCAL_MODE) {
+        if (toggleDetBtn) toggleDetBtn.style.display = 'none';
+        if (promptInput) promptInput.style.display = 'none';
+        if (detCanvas) {
+            detCanvas.style.pointerEvents = 'auto'; // Enable clicks for local mode
+            detCanvas.style.zIndex = '15'; // Ensure it's above the video but below controls
+        }
+        isDetectionRunning = true; // Always allow tap in local mode
+        sensor.init();
+        sensor.start();
+    }
+
+    // Local mode initialization via tap
+    detCanvas?.addEventListener('click', (e) => {
+        if (!isDetectionRunning) return;
+        console.log("Tap detected, initializing local tracker...");
+        
+        const rect = detCanvas.getBoundingClientRect();
+        const rx_canvas = e.clientX - rect.left;
+        const ry_canvas = e.clientY - rect.top;
+
+        const region = camera.visibleRegion;
+        
+        // Safety check for region
+        if (region.width === 0 || region.height === 0) {
+            console.warn("Camera region not ready yet");
+            return;
+        }
+
+        const rx = (rx_canvas / detCanvas.width) * region.width;
+        const ry = (ry_canvas / detCanvas.height) * region.height;
+
+        const boxSize = 60; // Slightly larger for better initialization
+        const box = [
+            Math.max(0, rx - boxSize/2), 
+            Math.max(0, ry - boxSize/2),
+            Math.min(region.width, rx + boxSize/2),
+            Math.min(region.height, ry + boxSize/2)
+        ];
+
+        if (tracker.init(videoEl, box, region)) {
+            isTrackingActive = true;
+            currentObjectCenter = { x: rx / region.width, y: ry / region.height };
+            console.log("Local Mode: Tracker successfully initialized at", rx, ry);
+            
+            // Immediate feedback: manual draw
+            UI.drawDetection(detCtx, detCanvas, {
+                label: 'Tracking...',
+                confidence: 1.0,
+                box: box
+            }, region.width, region.height);
+        } else {
+            console.warn("Local Mode: Tracker failed to initialize (try a point with more texture)");
+        }
+    });
+
     // Initialize services
     const cameraOk = await camera.start();
     if (!cameraOk) return;
@@ -69,7 +125,9 @@ async function init() {
     
     // Start Loops
     renderLoop();
-    detectionLoop();
+    if (!CONFIG.LOCAL_MODE) {
+        detectionLoop();
+    }
     trackingLoop();
 }
 

@@ -1,4 +1,5 @@
 export const CONFIG = {
+    LOCAL_MODE: true,
     API_URL: 'http://localhost:8000/detect',
     DEPTH_MODEL: 'onnx-community/depth-anything-v2-small',
     DEPTH_WIDTH: 168,
