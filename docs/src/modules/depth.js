@@ -14,6 +14,10 @@ export class DepthEstimator {
     async init() {
         console.log("Initializing Depth Estimator (Ultra-Stable Mode)...");
         
+        // Initializing canvas early to avoid null-pointer errors in predict()
+        this.canvas = new OffscreenCanvas(1, 1);
+        this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+
         // 1. Force environment as early as possible
         env.allowLocalModels = false;
         
@@ -23,11 +27,14 @@ export class DepthEstimator {
             env.backends.onnx.wasm.proxy = false; // Main-thread execution for maximum stability
         }
         
+        let usedBackend = 'unknown';
+
         try {
                 console.log("Attempting WebGPU...");
                 this.estimator = await pipeline('depth-estimation', this.modelId, { 
                     device: 'webgpu'
                 });
+                usedBackend = 'WebGPU';
         } catch (e) {
             console.log("WebGPU skipped/failed. Initializing WASM Fallback...");
             try {
@@ -35,21 +42,22 @@ export class DepthEstimator {
                     device: 'wasm',
                     dtype: 'q8'
                 });
+                usedBackend = 'WASM';
             } catch (wasmErr) {
                 console.error("BindingError persists? Memory limit might be reached:", wasmErr.message || wasmErr);
             }
         }
 
         if (this.estimator) {
-            console.log("Status: Depth Estimator Ready.");
+            console.log(`Status: Depth Estimator Ready (${usedBackend}).`);
+            
+            const infoEl = document.getElementById('backend-info');
+            if (infoEl) infoEl.innerText = `${usedBackend}`;
         }
-
-        this.canvas = new OffscreenCanvas(1, 1);
-        this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
     }
 
     async predict(videoElement, visibleRegion = null) {
-        if (!this.estimator || !videoElement) return null;
+        if (!this.estimator || !videoElement || !this.canvas) return null;
 
         // Determine source rectangle (full video or visible region)
         let sx = 0;

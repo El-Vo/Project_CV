@@ -50,6 +50,9 @@ async function init() {
     if (CONFIG.LOCAL_MODE) {
         if (toggleDetBtn) toggleDetBtn.style.display = 'none';
         if (promptInput) promptInput.style.display = 'none';
+        const controlsBottom = document.getElementById('controls-bottom');
+        if (controlsBottom) controlsBottom.style.background = 'none';
+        
         if (detCanvas) {
             detCanvas.style.pointerEvents = 'auto'; // Enable clicks for local mode
             detCanvas.style.zIndex = '15'; // Ensure it's above the video but below controls
