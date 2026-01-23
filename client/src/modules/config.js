@@ -9,5 +9,7 @@ export const CONFIG = {
     DETECTION_MAX_HEIGHT: 224,
     AUDIO_BEEP_FREQ: 800,
     AUDIO_MIN_DELAY: 100,
-    AUDIO_MAX_DELAY: 1000
+    AUDIO_MAX_DELAY: 1000,
+    TRACKER_SEARCH_RANGE: 60, // Grösserer Suchbereich für schnellere Bewegungen
+    TRACKER_SENSITIVITY: 200 // Deutlich toleranter für Lichtveränderungen
 };

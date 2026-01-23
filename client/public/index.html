@@ -20,13 +20,15 @@
     </div>
 
     <div id="controls-bottom">
-        <input type="text" id="promptInput" placeholder="Enter object to find..." value="spoon">
+        <input type="text" id="promptInput" placeholder="Enter object to find..." value="glasses">
         <button id="toggleDetBtn">Start</button>
     </div>
     
     <!-- Offscreen canvas for capturing frames for detection -->
     <canvas id="captureCanvas" style="display:none;"></canvas>
     
+    <!-- Official OpenCV.js Build -->
+    <script src="https://docs.opencv.org/4.5.4/opencv.js"></script>
     <script type="module" src="../src/ar.js"></script>
 </body>
 </html>

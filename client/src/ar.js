@@ -4,6 +4,7 @@ import { DepthEstimator } from './modules/depth.js';
 import { ParkingSensor } from './modules/audio.js';
 import { UI } from './modules/ui.js';
 import { detectObjects } from './modules/detection.js';
+import { FeatureTracker } from './modules/tracking.js';
 
 // DOM Elements
 const videoEl = document.getElementById('webcam');
@@ -19,9 +20,11 @@ const toggleDetBtn = document.getElementById('toggleDetBtn');
 const camera = new CameraHandler(videoEl);
 const depth = new DepthEstimator(CONFIG.DEPTH_MODEL);
 const sensor = new ParkingSensor();
+const tracker = new FeatureTracker();
 
 let isRunning = false;
 let isDetectionRunning = false;
+let isTrackingActive = false;
 let currentObjectCenter = null;
 let currentDepthData = null;
 
@@ -48,18 +51,33 @@ async function init() {
 
     await depth.init();
     
+    // Improved OpenCV loading check
+    if (typeof cv !== 'undefined') {
+        if (cv.Mat) {
+            console.log("OpenCV.js already ready");
+        } else {
+            cv.onRuntimeInitialized = () => {
+                console.log("OpenCV.js is ready via onRuntimeInitialized");
+            };
+        }
+    }
+
     isRunning = true;
     resizeDetectionOverlay();
+    
+    console.log("App initialized, starting loops...");
     
     // Start Loops
     renderLoop();
     detectionLoop();
+    trackingLoop();
 }
 
 function resizeDetectionOverlay() {
     if (detCanvas) {
         detCanvas.width = window.innerWidth;
         detCanvas.height = window.innerHeight;
+        console.log(`Detection overlay resized to: ${detCanvas.width}x${detCanvas.height}`);
     }
 }
 
@@ -75,6 +93,7 @@ function toggleDetection() {
     } else {
         sensor.stop();
         currentObjectCenter = null;
+        isTrackingActive = false;
         detFPS = 0;
         UI.clearCanvas(detCtx, detCanvas);
         UI.updateCrosshair(crosshairEl, null);
@@ -83,6 +102,12 @@ function toggleDetection() {
 
 async function detectionLoop() {
     if (!isRunning) return setTimeout(detectionLoop, 100);
+
+    // Skip heavy detection if we are already tracking an object
+    // Reduce wait time to 200ms for faster recovery after loss
+    if (isTrackingActive) {
+        return setTimeout(detectionLoop, 200);
+    }
 
     if (isDetectionRunning && videoEl.readyState >= 2) {
         const prompt = promptInput?.value.trim();
@@ -108,6 +133,13 @@ async function detectionLoop() {
             const topDet = data.detections[0];
             const [x1, y1, x2, y2] = topDet.box;
             
+            // Initialize tracker with coordinates relative to the visible region
+            console.log("Initializing tracker with box:", topDet.box);
+            if (tracker.init(videoEl, topDet.box, region)) {
+                isTrackingActive = true;
+                console.log("Tracking activated");
+            }
+
             currentObjectCenter = {
                 x: ((x1 + x2) / 2) / region.width,
                 y: ((y1 + y2) / 2) / region.height
@@ -125,6 +157,41 @@ async function detectionLoop() {
     }
 }
 
+async function trackingLoop() {
+    if (!isRunning) return requestAnimationFrame(trackingLoop);
+
+    if (isTrackingActive && videoEl.readyState >= 2) {
+        const now = performance.now();
+        const region = camera.visibleRegion;
+
+        const trackResult = tracker.track(videoEl, region);
+        
+        if (trackResult) {
+            const [x1, y1, x2, y2] = trackResult.box;
+            
+            currentObjectCenter = {
+                x: (x1 + x2) / 2 / region.width,
+                y: (y1 + y2) / 2 / region.height
+            };
+
+            UI.drawDetection(detCtx, detCanvas, {
+                label: 'Tracking...',
+                confidence: trackResult.confidence,
+                box: [x1, y1, x2, y2]
+            }, region.width, region.height);
+
+            detFPS = 1000 / (now - lastDetTime);
+            lastDetTime = now;
+        } else {
+            isTrackingActive = false;
+            currentObjectCenter = null;
+            UI.clearCanvas(detCtx, detCanvas);
+        }
+    }
+
+    requestAnimationFrame(trackingLoop);
+}
+
 async function renderLoop() {
     if (!isRunning) return;
 
@@ -132,17 +199,18 @@ async function renderLoop() {
         if (videoEl.readyState < 2) return requestAnimationFrame(renderLoop);
 
         const now = performance.now();
-        const interval = 1000 / CONFIG.DEPTH_FPS;
 
         // Optimization: Only run depth if object detected
-        /* if (!currentObjectCenter) {
+        if (!currentObjectCenter) {
             UI.clearCanvas(depthCtx, depthCanvas);
             UI.updateCrosshair(crosshairEl, null);
             if (distanceEl) distanceEl.innerText = "--";
             sensor.update(0, false);
             return requestAnimationFrame(renderLoop);
-        } */
+        }
 
+        // 2. Depth Logic
+        const interval = 1000 / CONFIG.DEPTH_FPS;
         if (now - lastDepthTime >= interval) {
             const depthPrediction = await depth.predict(videoEl, camera.visibleRegion);
             if (depthPrediction) {
