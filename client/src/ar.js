@@ -103,12 +103,6 @@ function toggleDetection() {
 async function detectionLoop() {
     if (!isRunning) return setTimeout(detectionLoop, 100);
 
-    // Skip heavy detection if we are already tracking an object
-    // Reduce wait time to 200ms for faster recovery after loss
-    if (isTrackingActive) {
-        return setTimeout(detectionLoop, 200);
-    }
-
     if (isDetectionRunning && videoEl.readyState >= 2) {
         const prompt = promptInput?.value.trim();
         if (!prompt) return setTimeout(detectionLoop, 500);
@@ -133,11 +127,11 @@ async function detectionLoop() {
             const topDet = data.detections[0];
             const [x1, y1, x2, y2] = topDet.box;
             
-            // Initialize tracker with coordinates relative to the visible region
-            console.log("Initializing tracker with box:", topDet.box);
+            // Initialize/Re-initialize tracker with coordinates relative to the visible region
+            console.log("Initializing/Refreshing tracker with box:", topDet.box);
             if (tracker.init(videoEl, topDet.box, region)) {
                 isTrackingActive = true;
-                console.log("Tracking activated");
+                console.log("Tracking activated/refreshed");
             }
 
             currentObjectCenter = {
@@ -146,12 +140,16 @@ async function detectionLoop() {
             };
 
             UI.drawDetection(detCtx, detCanvas, topDet, region.width, region.height);
-        } else {
+        } else if (!isTrackingActive) {
+            // Only clear if we aren't tracking (otherwise tracker might still be valid)
             currentObjectCenter = null;
             UI.clearCanvas(detCtx, detCanvas);
         }
         
-        setTimeout(detectionLoop, 1000 / CONFIG.DETECTION_FPS);
+        // If tracking is active, wait 2 seconds before checking again (refresh mode)
+        // If not tracking, use standard FPS to find an object quickly
+        const nextDelay = isTrackingActive ? 2000 : (1000 / CONFIG.DETECTION_FPS);
+        setTimeout(detectionLoop, nextDelay);
     } else {
         setTimeout(detectionLoop, 100);
     }
