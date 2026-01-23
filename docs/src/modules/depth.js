@@ -23,18 +23,11 @@ export class DepthEstimator {
             env.backends.onnx.wasm.proxy = false; // Main-thread execution for maximum stability
         }
         
-        // 3. Try specifically for the environment
-        const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-        
         try {
-            if (!isMobile && navigator.gpu) {
                 console.log("Attempting WebGPU...");
                 this.estimator = await pipeline('depth-estimation', this.modelId, { 
                     device: 'webgpu'
                 });
-            } else {
-                throw new Error("Skipping WebGPU for mobile stability");
-            }
         } catch (e) {
             console.log("WebGPU skipped/failed. Initializing WASM Fallback...");
             try {
