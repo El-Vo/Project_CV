@@ -12,34 +12,47 @@ export class DepthEstimator {
     }
 
     async init() {
-        console.log("Initializing Depth Estimator with model:", this.modelId);
+        console.log("Initializing Depth Estimator (Ultra-Stable Mode)...");
         
-        // Optimize for browser environment
-        env.backends.onnx.wasm.numThreads = 1; // Prevent issues with missing COOP/COEP headers
+        // 1. Force environment as early as possible
+        env.allowLocalModels = false;
+        
+        // 2. Ultra-stable WASM settings for Mobile
+        if (env.backends && env.backends.onnx) {
+            env.backends.onnx.wasm.numThreads = 1;
+            env.backends.onnx.wasm.proxy = false; // Main-thread execution for maximum stability
+        }
+        
+        // 3. Try specifically for the environment
+        const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
         
         try {
-            this.estimator = await pipeline('depth-estimation', this.modelId, {
-                device: 'webgpu',
-            });
-            console.log("Depth Anything V2 loaded on WebGPU");
-        } catch (err) {
-            console.warn("WebGPU failed, falling back to WASM with quantization:", err);
-            try {
-                // Using q8 (8-bit quantization) is much more stable and faster for WASM
-                this.estimator = await pipeline('depth-estimation', this.modelId, {
-                    device: 'wasm',
-                    dtype: 'q8', 
+            if (!isMobile && navigator.gpu) {
+                console.log("Attempting WebGPU...");
+                this.estimator = await pipeline('depth-estimation', this.modelId, { 
+                    device: 'webgpu'
                 });
-                console.log("Depth Anything V2 loaded on WASM (q8)");
-            } catch (wasmErr) {
-                console.error("Critical: Depth estimation failed to load entirely:", wasmErr);
-                this.estimator = null; 
+            } else {
+                throw new Error("Skipping WebGPU for mobile stability");
             }
-        } finally {
-            // Ensure canvas is created even if estimator fails
-            this.canvas = new OffscreenCanvas(1, 1);
-            this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+        } catch (e) {
+            console.log("WebGPU skipped/failed. Initializing WASM Fallback...");
+            try {
+                this.estimator = await pipeline('depth-estimation', this.modelId, { 
+                    device: 'wasm',
+                    dtype: 'q8'
+                });
+            } catch (wasmErr) {
+                console.error("BindingError persists? Memory limit might be reached:", wasmErr.message || wasmErr);
+            }
         }
+
+        if (this.estimator) {
+            console.log("Status: Depth Estimator Ready.");
+        }
+
+        this.canvas = new OffscreenCanvas(1, 1);
+        this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
     }
 
     async predict(videoElement, visibleRegion = null) {
