@@ -187,13 +187,12 @@ async function detectionLoop() {
         detFPS = 1000 / (now - lastDetTime);
         lastDetTime = now;
 
-        if (data?.status === 'success' && data.detections?.length > 0) {
-            const topDet = data.detections[0];
-            const [x1, y1, x2, y2] = topDet.box;
+        if (data?.detection) {
+            const [x1, y1, x2, y2] = data.detection.box;
             
             // Initialize/Re-initialize tracker with coordinates relative to the visible region
-            console.log("Initializing/Refreshing tracker with box:", topDet.box);
-            if (tracker.init(videoEl, topDet.box, region)) {
+            console.log("Initializing/Refreshing tracker with box:", data.detection.box);
+            if (tracker.init(videoEl, data.detection.box, region)) {
                 isTrackingActive = true;
                 console.log("Tracking activated/refreshed");
             }
@@ -203,7 +202,7 @@ async function detectionLoop() {
                 y: ((y1 + y2) / 2) / region.height
             };
 
-            UI.drawDetection(detCtx, detCanvas, topDet, region.width, region.height);
+            UI.drawDetection(detCtx, detCanvas, data.detection, region.width, region.height);
         } else if (!isTrackingActive) {
             // Only clear if we aren't tracking (otherwise tracker might still be valid)
             currentObjectCenter = null;

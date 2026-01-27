@@ -1,16 +1,16 @@
 export const CONFIG = {
-    LOCAL_MODE: true,
+    LOCAL_MODE: false,
     API_URL: 'http://localhost:8000/detect',
     DEPTH_MODEL: 'onnx-community/depth-anything-v2-small',
     DEPTH_WIDTH: 84,
     DEPTH_HEIGHT: 84,
     DEPTH_FPS: 15,
-    DETECTION_FPS: 5,
+    DETECTION_FPS: 1,
     DETECTION_MAX_WIDTH: 224,
     DETECTION_MAX_HEIGHT: 224,
     AUDIO_BEEP_FREQ: 800,
     AUDIO_MIN_DELAY: 100,
     AUDIO_MAX_DELAY: 1000,
-    TRACKER_SEARCH_RANGE: 60, // Grösserer Suchbereich für schnellere Bewegungen
-    TRACKER_SENSITIVITY: 200 // Deutlich toleranter für Lichtveränderungen
+    TRACKER_SEARCH_RANGE: 60,
+    TRACKER_SENSITIVITY: 200 
 };

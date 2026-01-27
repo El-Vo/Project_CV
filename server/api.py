@@ -1,10 +1,8 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-import cv2
-import numpy as np
 import io
 from PIL import Image
-import os
+from .detector import ObjectDetector
 
 app = FastAPI()
 
@@ -20,4 +18,7 @@ detector = ObjectDetector(model_path='models/yolov8s-world.pt')
 
 @app.post('/detect')
 async def detect_object(prompt: str = Form(...), file: UploadFile = File(...)):
-    
+    contents = await file.read()
+    image = Image.open(io.BytesIO(contents))
+    detection = detector.predict(image, prompt)
+    return {"detection": detection}
