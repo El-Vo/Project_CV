@@ -11,7 +11,6 @@ const videoEl = document.getElementById('webcam');
 const depthCanvas = document.getElementById('depth-canvas');
 const detCanvas = document.getElementById('detection-overlay');
 const captureCanvas = document.getElementById('captureCanvas');
-const crosshairEl = document.getElementById('crosshair');
 const distanceEl = document.getElementById('distance');
 const promptInput = document.getElementById('promptInput');
 const toggleDetBtn = document.getElementById('toggleDetBtn');
@@ -160,7 +159,6 @@ function toggleDetection() {
         isTrackingActive = false;
         detFPS = 0;
         UI.clearCanvas(detCtx, detCanvas);
-        UI.updateCrosshair(crosshairEl, null);
     }
 }
 
@@ -269,7 +267,6 @@ async function renderLoop() {
         // Optimization: Only run depth if object detected
         if (!currentObjectCenter) {
             UI.clearCanvas(depthCtx, depthCanvas);
-            UI.updateCrosshair(crosshairEl, null);
             if (distanceEl) distanceEl.innerText = "--";
             sensor.update(0, false);
             return requestAnimationFrame(renderLoop);
@@ -306,7 +303,6 @@ async function renderLoop() {
 
                     if (distanceEl) distanceEl.innerText = val.toFixed(3);
                     sensor.update(val, true);
-                    UI.updateCrosshair(crosshairEl, currentObjectCenter);
                 } else {
                     sensor.update(0, false);
                 }

@@ -1,9 +1,14 @@
-export const UI = {
-    clearCanvas(ctx, canvas) {
+export class Rectangle {
+  constructor(height, width) {
+    this.height = height;
+    this.width = width;
+  }
+
+  clearCanvas(ctx, canvas) {
         if (ctx && canvas) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
-    },
+    }
 
     drawDetection(ctx, canvas, det, sw, sh) {
         if (!ctx || !canvas || !det) return;
@@ -28,20 +33,7 @@ export const UI = {
         ctx.fillRect(rx, ry - 25, ctx.measureText(label).width + 10, 25);
         ctx.fillStyle = 'black';
         ctx.fillText(label, rx + 5, ry - 7);
-    },
-
-    updateCrosshair(el, center) {
-        if (!el) return;
-        if (center) {
-            el.style.left = `${center.x * 100}%`;
-            el.style.top = `${center.y * 100}%`;
-            el.style.borderColor = '#ff3232';
-        } else {
-            el.style.left = '50%';
-            el.style.top = '50%';
-            el.style.borderColor = '#32c8ff';
-        }
-    },
+    }
 
     updateFPS(depthFPS, detFPS) {
         const depthEl = document.getElementById('depth-fps');
@@ -49,4 +41,4 @@ export const UI = {
         if (depthEl) depthEl.innerText = depthFPS.toFixed(1);
         if (detEl) detEl.innerText = detFPS.toFixed(1);
     }
-};
+}
