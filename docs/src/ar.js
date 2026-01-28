@@ -1,326 +1,221 @@
-import { CONFIG } from './modules/config.js';
-import { CameraHandler } from './modules/camera.js';
-import { DepthEstimator } from './modules/depth.js';
-import { ParkingSensor } from './modules/audio.js';
-import { UI } from './modules/ui.js';
-import { detectObjects } from './modules/detection.js';
-import { FeatureTracker } from './modules/tracking.js';
-
-// DOM Elements
-const videoEl = document.getElementById('webcam');
-const depthCanvas = document.getElementById('depth-canvas');
-const detCanvas = document.getElementById('detection-overlay');
-const captureCanvas = document.getElementById('captureCanvas');
-const distanceEl = document.getElementById('distance');
-const promptInput = document.getElementById('promptInput');
-const toggleDetBtn = document.getElementById('toggleDetBtn');
+import { CONFIG } from "./modules/config.js";
+import { CameraHandler } from "./modules/camera.js";
+import { DepthEstimator } from "./modules/depth.js";
+import { ParkingSensor } from "./modules/audio.js";
+import { UI } from "./modules/ui.js";
+import { Detection } from "./modules/detection.js";
+import { FeatureTracker } from "./modules/tracking.js";
 
 // Handlers & State
-const camera = new CameraHandler(videoEl);
 const depth = new DepthEstimator(CONFIG.DEPTH_MODEL);
-const sensor = new ParkingSensor();
 const tracker = new FeatureTracker();
 
 let isRunning = false;
-let isDetectionRunning = false;
 let isTrackingActive = false;
 let currentObjectCenter = null;
-let currentDepthData = null;
 
 // FPS Tracking
 let lastDepthTime = performance.now();
-let lastDetTime = performance.now();
 let depthFPS = 0;
-let detFPS = 0;
 let lastUIPdateTime = 0;
 
-// Contexts
-const depthCtx = depthCanvas?.getContext('2d');
-const detCtx = detCanvas?.getContext('2d');
-const captureCtx = captureCanvas?.getContext('2d');
+export class AR {
+  #lastDetectionTimestamp = 0;
 
-async function init() {
-    // Setup UI listeners
-    toggleDetBtn?.addEventListener('click', toggleDetection);
-    window.addEventListener('resize', () => resizeDetectionOverlay());
+  webcam = document.getElementById("webcam");
+  depthCanvas = document.getElementById("depth-canvas");
+  captureCanvas = document.getElementById("capture-canvas");
+  detectionCanvas = document.getElementById("detection-canvas");
 
-    resizeDetectionOverlay();
+  constructor() {
+    UI.setLocalMode();
 
-    if (CONFIG.LOCAL_MODE) {
-        if (toggleDetBtn) toggleDetBtn.style.display = 'none';
-        if (promptInput) promptInput.style.display = 'none';
-        const controlsBottom = document.getElementById('controls-bottom');
-        if (controlsBottom) controlsBottom.style.background = 'none';
-        
-        if (detCanvas) {
-            detCanvas.style.pointerEvents = 'auto'; // Enable clicks for local mode
-            detCanvas.style.zIndex = '15'; // Ensure it's above the video but below controls
-        }
-        isDetectionRunning = true; // Always allow tap in local mode
-    }
-
-    // Local mode initialization via tap
-    detCanvas?.addEventListener('click', (e) => {
-        if (!isDetectionRunning) return;
-        console.log("Tap detected, initializing local tracker...");
-        
-        const rect = detCanvas.getBoundingClientRect();
-        const rx_canvas = e.clientX - rect.left;
-        const ry_canvas = e.clientY - rect.top;
-
-        const region = camera.visibleRegion;
-        
-        // Safety check for region
-        if (region.width === 0 || region.height === 0) {
-            console.warn("Camera region not ready yet");
-            return;
-        }
-
-        const rx = (rx_canvas / detCanvas.width) * region.width;
-        const ry = (ry_canvas / detCanvas.height) * region.height;
-
-        const boxSize = 60; // Slightly larger for better initialization
-        const box = [
-            Math.max(0, rx - boxSize/2), 
-            Math.max(0, ry - boxSize/2),
-            Math.min(region.width, rx + boxSize/2),
-            Math.min(region.height, ry + boxSize/2)
-        ];
-
-        if (tracker.init(videoEl, box, region)) {
-            isTrackingActive = true;
-            currentObjectCenter = { x: rx / region.width, y: ry / region.height };
-            console.log("Local Mode: Tracker successfully initialized at", rx, ry);
-            sensor.init();
-            sensor.start();
-            
-            // Immediate feedback: manual draw
-            UI.drawDetection(detCtx, detCanvas, {
-                label: 'Tracking...',
-                confidence: 1.0,
-                box: box
-            }, region.width, region.height);
-        } else {
-            console.warn("Local Mode: Tracker failed to initialize (try a point with more texture)");
-        }
+    this.camera = new CameraHandler(this.webcam, this.captureCanvas);
+    this.camera.start().then(() => {
+      this.updateCanvasDimensions();
     });
 
-    // Start Loops immediately to allow UI updates/tracking
-    renderLoop();
-    if (!CONFIG.LOCAL_MODE) {
-        detectionLoop();
-    }
-    trackingLoop();
+    this.detector = new Detection(this.detectionCanvas);
 
-    // Initialize services
-    const cameraOk = await camera.start();
-    if (!cameraOk) return;
+    UI.toggleDetBtn.addEventListener("click", () => {
+      this.detector.toggleDetection();
+      UI.toggleDetectionUI(this.detector.getDetectionStatus());
+    });
 
-    isRunning = true;
-    console.log("Basic services ready, loading depth model...");
+    // Update visible region on window resize
+    window.addEventListener("resize", () => {
+      console.log("Window resized!");
+      this.updateCanvasDimensions();
+    });
+  }
 
-
-    depth.init();
-    
-    // Improved OpenCV loading check
-    if (typeof cv !== 'undefined') {
-        if (cv.Mat) {
-            console.log("OpenCV.js already ready");
-        } else {
-            cv.onRuntimeInitialized = () => {
-                console.log("OpenCV.js is ready via onRuntimeInitialized");
-            };
-        }
+  loop() {
+    // Object detection step
+    if (
+      this.detector.getDetectionStatus() &&
+      performance.now() >
+        this.#lastDetectionTimestamp + 1000 / CONFIG.DETECTION_FPS
+    ) {
+      this.#lastDetectionTimestamp = performance.now();
     }
 
-    console.log("App initialization sequence complete.");
+    //restart loop continously
+    this.loop();
+  }
+
+  updateCanvasDimensions() {
+    const visibleRegion = this.camera.updateVisibleRegion();
+    console.log(visibleRegion);
+    this.camera.setDimensionsAndPosition(window.innerWidth, window.innerHeight);
+    this.detector.setDimensionsAndPosition(
+      window.innerWidth,
+      window.innerHeight,
+    );
+  }
 }
+async function init() {
+  // Start Loops immediately to allow UI updates/tracking
+  renderLoop();
+  trackingLoop();
 
-function resizeDetectionOverlay() {
-    if (detCanvas) {
-        detCanvas.width = window.innerWidth;
-        detCanvas.height = window.innerHeight;
-        console.log(`Detection overlay resized to: ${detCanvas.width}x${detCanvas.height}`);
-    }
-}
+  // Initialize services
+  const cameraOk = await camera.start();
+  if (!cameraOk) return;
 
-function toggleDetection() {
-    isDetectionRunning = !isDetectionRunning;
-    if (toggleDetBtn) {
-        toggleDetBtn.innerText = isDetectionRunning ? 'Stop' : 'Start';
-    }
+  isRunning = true;
+  console.log("Basic services ready, loading depth model...");
 
-    if (isDetectionRunning) {
-        sensor.init();
-        sensor.start();
+  depth.init();
+
+  // Improved OpenCV loading check
+  if (typeof cv !== "undefined") {
+    if (cv.Mat) {
+      console.log("OpenCV.js already ready");
     } else {
-        sensor.stop();
-        currentObjectCenter = null;
-        isTrackingActive = false;
-        detFPS = 0;
-        UI.clearCanvas(detCtx, detCanvas);
+      cv.onRuntimeInitialized = () => {
+        console.log("OpenCV.js is ready via onRuntimeInitialized");
+      };
     }
-}
+  }
 
-async function detectionLoop() {
-    if (!isRunning) return setTimeout(detectionLoop, 100);
-
-    if (isDetectionRunning && videoEl.readyState >= 2) {
-        const prompt = promptInput?.value.trim();
-        if (!prompt) return setTimeout(detectionLoop, 500);
-
-        const region = camera.visibleRegion;
-        captureCanvas.width = region.width;
-        captureCanvas.height = region.height;
-        captureCtx.drawImage(
-            videoEl, 
-            region.x, region.y, region.width, region.height,
-            0, 0, region.width, region.height
-        );
-
-        const data = await detectObjects(captureCanvas, prompt);
-
-        // Update detection FPS
-        const now = performance.now();
-        detFPS = 1000 / (now - lastDetTime);
-        lastDetTime = now;
-
-        if (data?.detection) {
-            const [x1, y1, x2, y2] = data.detection.box;
-            
-            // Initialize/Re-initialize tracker with coordinates relative to the visible region
-            console.log("Initializing/Refreshing tracker with box:", data.detection.box);
-            if (tracker.init(videoEl, data.detection.box, region)) {
-                isTrackingActive = true;
-                console.log("Tracking activated/refreshed");
-            }
-
-            currentObjectCenter = {
-                x: ((x1 + x2) / 2) / region.width,
-                y: ((y1 + y2) / 2) / region.height
-            };
-
-            UI.drawDetection(detCtx, detCanvas, data.detection, region.width, region.height);
-        } else if (!isTrackingActive) {
-            // Only clear if we aren't tracking (otherwise tracker might still be valid)
-            currentObjectCenter = null;
-            UI.clearCanvas(detCtx, detCanvas);
-        }
-        
-        // If tracking is active, wait 2 seconds before checking again (refresh mode)
-        // If not tracking, use standard FPS to find an object quickly
-        const nextDelay = isTrackingActive ? 2000 : (1000 / CONFIG.DETECTION_FPS);
-        setTimeout(detectionLoop, nextDelay);
-    } else {
-        setTimeout(detectionLoop, 100);
-    }
+  console.log("App initialization sequence complete.");
 }
 
 async function trackingLoop() {
-    if (!isRunning) return requestAnimationFrame(trackingLoop);
+  if (!isRunning) return requestAnimationFrame(trackingLoop);
 
-    try {
-        if (isTrackingActive && videoEl.readyState >= 2) {
-            const now = performance.now();
-            const region = camera.visibleRegion;
+  try {
+    if (isTrackingActive && webcam.readyState >= 2) {
+      const now = performance.now();
+      const region = camera.visibleRegion;
 
-            const trackResult = tracker.track(videoEl, region);
-            
-            if (trackResult) {
-                const [x1, y1, x2, y2] = trackResult.box;
-                
-                currentObjectCenter = {
-                    x: (x1 + x2) / 2 / region.width,
-                    y: (y1 + y2) / 2 / region.height
-                };
+      const trackResult = tracker.track(webcam, region);
 
-                UI.drawDetection(detCtx, detCanvas, {
-                    label: 'Tracking...',
-                    confidence: trackResult.confidence,
-                    box: [x1, y1, x2, y2]
-                }, region.width, region.height);
+      if (trackResult) {
+        const [x1, y1, x2, y2] = trackResult.box;
 
-                detFPS = 1000 / (now - lastDetTime);
-                lastDetTime = now;
-            } else {
-                console.log("Tracker lost object");
-                isTrackingActive = false;
-                currentObjectCenter = null;
-                UI.clearCanvas(detCtx, detCanvas);
-            }
-        }
-    } catch (err) {
-        console.error("Tracking loop error:", err);
+        currentObjectCenter = {
+          x: (x1 + x2) / 2 / region.width,
+          y: (y1 + y2) / 2 / region.height,
+        };
+
+        UI.drawDetection(
+          detCtx,
+          detCanvas,
+          {
+            label: "Tracking...",
+            confidence: trackResult.confidence,
+            box: [x1, y1, x2, y2],
+          },
+          region.width,
+          region.height,
+        );
+
+        detFPS = 1000 / (now - lastDetTime);
+        lastDetTime = now;
+      } else {
+        console.log("Tracker lost object");
+        isTrackingActive = false;
+        currentObjectCenter = null;
+        UI.clearCanvas(detCtx, detCanvas);
+      }
     }
+  } catch (err) {
+    console.error("Tracking loop error:", err);
+  }
 
-    requestAnimationFrame(trackingLoop);
+  requestAnimationFrame(trackingLoop);
 }
 
 async function renderLoop() {
-    if (!isRunning) return requestAnimationFrame(renderLoop);
+  if (!isRunning) return requestAnimationFrame(renderLoop);
 
-    try {
-        if (videoEl.readyState < 2) return requestAnimationFrame(renderLoop);
+  try {
+    if (webcam.readyState < 2) return requestAnimationFrame(renderLoop);
 
-        const now = performance.now();
+    const now = performance.now();
 
-        // Optimization: Only run depth if object detected
-        if (!currentObjectCenter) {
-            UI.clearCanvas(depthCtx, depthCanvas);
-            if (distanceEl) distanceEl.innerText = "--";
-            sensor.update(0, false);
-            return requestAnimationFrame(renderLoop);
-        }
-
-        // 2. Depth Logic
-        const interval = 1000 / CONFIG.DEPTH_FPS;
-        if (now - lastDepthTime >= interval) {
-            const depthPrediction = await depth.predict(videoEl, camera.visibleRegion);
-            if (depthPrediction) {
-                // Update depth FPS
-                depthFPS = 1000 / (now - lastDepthTime);
-                lastDepthTime = now;
-
-                currentDepthData = depthPrediction.data;
-                const { width, height } = depthPrediction;
-                
-                // Draw visual depth map
-                if (depthCanvas && depthPrediction.toCanvas) {
-                    const visualCanvas = await depthPrediction.toCanvas();
-                    if (depthCanvas.width !== visualCanvas.width || depthCanvas.height !== visualCanvas.height) {
-                        depthCanvas.width = visualCanvas.width;
-                        depthCanvas.height = visualCanvas.height;
-                    }
-                    depthCtx.drawImage(visualCanvas, 0, 0);
-                }
-
-                // Update distance and sensor
-                if (currentObjectCenter) {
-                    const tx = Math.floor(currentObjectCenter.x * width);
-                    const ty = Math.floor(currentObjectCenter.y * height);
-                    const idx = Math.max(0, Math.min(width * height - 1, ty * width + tx));
-                    const val = currentDepthData[idx];
-
-                    if (distanceEl) distanceEl.innerText = val.toFixed(3);
-                    sensor.update(val, true);
-                } else {
-                    sensor.update(0, false);
-                }
-            }
-        }
-
-        // Periodically update UI stats
-        if (now - lastUIPdateTime > 500) {
-            UI.updateFPS(depthFPS, detFPS);
-            lastUIPdateTime = now;
-        }
-
-    } catch (err) {
-        console.error("Render loop error:", err);
+    // Optimization: Only run depth if object detected
+    if (!currentObjectCenter) {
+      UI.clearCanvas(depthCtx, depthCanvas);
+      if (distanceEl) distanceEl.innerText = "--";
+      sensor.update(0, false);
+      return requestAnimationFrame(renderLoop);
     }
 
-    requestAnimationFrame(renderLoop);
+    // 2. Depth Logic
+    const interval = 1000 / CONFIG.DEPTH_FPS;
+    if (now - lastDepthTime >= interval) {
+      const depthPrediction = await depth.predict(webcam, camera.visibleRegion);
+      if (depthPrediction) {
+        // Update depth FPS
+        depthFPS = 1000 / (now - lastDepthTime);
+        lastDepthTime = now;
+
+        currentDepthData = depthPrediction.data;
+        const { width, height } = depthPrediction;
+
+        // Draw visual depth map
+        if (depthCanvas && depthPrediction.toCanvas) {
+          const visualCanvas = await depthPrediction.toCanvas();
+          if (
+            depthCanvas.width !== visualCanvas.width ||
+            depthCanvas.height !== visualCanvas.height
+          ) {
+            depthCanvas.width = visualCanvas.width;
+            depthCanvas.height = visualCanvas.height;
+          }
+          depthCtx.drawImage(visualCanvas, 0, 0);
+        }
+
+        // Update distance and sensor
+        if (currentObjectCenter) {
+          const tx = Math.floor(currentObjectCenter.x * width);
+          const ty = Math.floor(currentObjectCenter.y * height);
+          const idx = Math.max(
+            0,
+            Math.min(width * height - 1, ty * width + tx),
+          );
+          const val = currentDepthData[idx];
+
+          if (distanceEl) distanceEl.innerText = val.toFixed(3);
+          sensor.update(val, true);
+        } else {
+          sensor.update(0, false);
+        }
+      }
+    }
+
+    // Periodically update UI stats
+    if (now - lastUIPdateTime > 500) {
+      UI.updateFPS(depthFPS, detFPS);
+      lastUIPdateTime = now;
+    }
+  } catch (err) {
+    console.error("Render loop error:", err);
+  }
+
+  requestAnimationFrame(renderLoop);
 }
 
-// Global entry point
-init();
+const main = new AR();

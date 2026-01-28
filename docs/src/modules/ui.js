@@ -1,44 +1,29 @@
-export class Rectangle {
-  constructor(height, width) {
-    this.height = height;
-    this.width = width;
+import { CONFIG } from "./config.js";
+
+export class UI {
+  static promptInput = document.getElementById("promptInput");
+  static toggleDetBtn = document.getElementById("toggleDetBtn");
+  static distanceEl = document.getElementById("distance");
+  static controlsBottom = document.getElementById("controls-bottom");
+  static depthEl = document.getElementById("depth-fps");
+  static detEl = document.getElementById("det-fps");
+
+  static setLocalMode(mode = CONFIG.LOCAL_MODE) {
+    this.promptInput.style.display = mode ? "none" : "flex";
+    this.controlsBottom.style.display = mode ? "none" : "flex";
+    this.toggleDetBtn.style.display = mode ? "none" : "flex";
   }
 
-  clearCanvas(ctx, canvas) {
-        if (ctx && canvas) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
-    }
+  static toggleDetectionUI(isDetectionRunning) {
+    this.toggleDetBtn.innerText = isDetectionRunning ? "Stop" : "Start";
+  }
 
-    drawDetection(ctx, canvas, det, sw, sh) {
-        if (!ctx || !canvas || !det) return;
-        this.clearCanvas(ctx, canvas);
+  static updateFPS(depthFPS, detFPS) {
+    this.depthEl.innerText = depthFPS.toFixed(1);
+    this.detEl.innerText = detFPS.toFixed(1);
+  }
 
-        const [x1, y1, x2, y2] = det.box;
-        const scaleX = canvas.width / sw;
-        const scaleY = canvas.height / sh;
-
-        const rx = x1 * scaleX;
-        const ry = y1 * scaleY;
-        const rw = (x2 - x1) * scaleX;
-        const rh = (y2 - y1) * scaleY;
-
-        ctx.strokeStyle = '#32c8ff';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(rx, ry, rw, rh);
-        
-        ctx.fillStyle = '#32c8ff';
-        const label = `${det.label} (${Math.round(det.confidence * 100)}%)`;
-        ctx.font = 'bold 18px Arial';
-        ctx.fillRect(rx, ry - 25, ctx.measureText(label).width + 10, 25);
-        ctx.fillStyle = 'black';
-        ctx.fillText(label, rx + 5, ry - 7);
-    }
-
-    updateFPS(depthFPS, detFPS) {
-        const depthEl = document.getElementById('depth-fps');
-        const detEl = document.getElementById('det-fps');
-        if (depthEl) depthEl.innerText = depthFPS.toFixed(1);
-        if (detEl) detEl.innerText = detFPS.toFixed(1);
-    }
+  static getTextPrompt() {
+    return this.promptInput.value.trim();
+  }
 }
