@@ -6,21 +6,17 @@ import { UI } from "./modules/ui.js";
 import { RemoteDetection } from "./modules/remoteDetection.js";
 import { FeatureTracker } from "./modules/tracking.js";
 import { TapDetection } from "./modules/tapDetection.js";
-
-// Handlers & State
-const depth = new DepthEstimator(CONFIG.DEPTH_MODEL);
-
-// FPS Tracking
-let lastDepthTime = performance.now();
-let depthFPS = 0;
-let lastUIPdateTime = 0;
+import { DepthUIController } from "./modules/depthUI.js";
 
 export class AR {
   #lastDetectionTimestamp = 0;
   #lastTrackingTimestamp = 0;
   #countOfSuccessfulTrackingiterations = 0;
+  #lastDepthEstimationTimestamp = 0;
   #isDetecting = false;
   #isTracking = false;
+  #isDepthEstimating = false;
+  #CurrentObjectCenter = { x: 0, y: 0 };
 
   webcam = document.getElementById("webcam");
   depthCanvas = document.getElementById("depth-canvas");
@@ -41,6 +37,13 @@ export class AR {
     }
 
     this.tracker = new FeatureTracker(this.detectionCanvas);
+
+    this.depth = new DepthEstimator(CONFIG.DEPTH_MODEL);
+    this.depth.init();
+    this.depthUI = new DepthUIController(this.depthCanvas);
+
+    this.sensor = new ParkingSensor();
+    this.sensor.init();
 
     // Update visible region on window resize
     window.addEventListener("resize", () => {
@@ -71,9 +74,21 @@ export class AR {
       this.#lastTrackingTimestamp = performance.now();
     }
 
-    //Clear bounding boxes if no text input is given
+    //Depth estimation step
+    if (
+      this.#isTracking &&
+      !this.#isDepthEstimating &&
+      performance.now() >
+        this.#lastDepthEstimationTimestamp + 1000 / CONFIG.DEPTH_FPS_TARGET
+    ) {
+      this.updateDepth();
+      this.#lastDepthEstimationTimestamp = performance.now();
+    }
+
+    //Clear bounding boxes if no text input is given and stop audio
     if (UI.getTextPrompt() == "") {
       this.tracker.clearCanvas();
+      this.sensor.stop();
     }
 
     requestAnimationFrame(() => this.loop());
@@ -109,6 +124,7 @@ export class AR {
         this.camera.takePictureResized(false),
         detection.box,
       );
+      this.sensor.start();
     }
 
     if (this.#isTracking) {
@@ -118,9 +134,12 @@ export class AR {
         this.#isTracking = false;
         this.#countOfSuccessfulTrackingiterations = 0;
         this.tracker.clearCanvas();
+        this.sensor.stop();
       } else {
         // Scale back up from resized coordinates to full picture coordinates
         detection.box = this.camera.scaleBoundingBoxFromResized(detection.box);
+
+        this.updateObjectCenter(detection.box);
 
         detection.box = this.camera.translateBoundingBoxToWindowScaling(
           detection.box,
@@ -141,6 +160,37 @@ export class AR {
     }
   }
 
+  updateObjectCenter(box) {
+    let [x1, y1, x2, y2] = box;
+    this.#CurrentObjectCenter = {
+      x: (x2 - x1) / 2,
+      y: (y2 - y1) / 2,
+    };
+  }
+
+  async updateDepth() {
+    this.#isDepthEstimating = true;
+    try {
+      const depthPrediction = await this.depth.predict(
+        this.camera.takePicture(false),
+      );
+
+      this.depthUI.setDepthPrediction(depthPrediction);
+      this.depthUI.updateDepthCanvas();
+      //Scale objectPosition based on raw camera input to depth map resoulution
+      const depthObjectCenter = {
+        x: this.depth.scaleRawCameraToDepthX(this.#CurrentObjectCenter.x),
+        y: this.depth.scaleRawCameraToDepthY(this.#CurrentObjectCenter.y),
+      };
+      const obj_depth = this.depthUI.updateDepthOfObject(depthObjectCenter);
+      this.sensor.update(obj_depth);
+    } catch (err) {
+      console.error("Depth estimation error:", err);
+    } finally {
+      this.#isDepthEstimating = false;
+    }
+  }
+
   updateCanvasDimensions() {
     const visibleRegion = this.camera.updateVisibleRegion();
     this.camera.setDimensionsAndPosition(
@@ -152,139 +202,6 @@ export class AR {
       window.innerHeight,
     );
   }
-}
-async function init() {
-  // Start Loops immediately to allow UI updates/tracking
-  renderLoop();
-  trackingLoop();
-
-  // Initialize services
-  const cameraOk = await camera.start();
-  if (!cameraOk) return;
-
-  isRunning = true;
-  console.log("Basic services ready, loading depth model...");
-
-  depth.init();
-
-  console.log("App initialization sequence complete.");
-}
-
-async function trackingLoop() {
-  if (!isRunning) return requestAnimationFrame(trackingLoop);
-
-  try {
-    if (isTrackingActive && webcam.readyState >= 2) {
-      const now = performance.now();
-      const region = camera.visibleRegion;
-
-      const trackResult = tracker.track(webcam, region);
-
-      if (trackResult) {
-        const [x1, y1, x2, y2] = trackResult.box;
-
-        currentObjectCenter = {
-          x: (x1 + x2) / 2 / region.width,
-          y: (y1 + y2) / 2 / region.height,
-        };
-
-        UI.drawDetection(
-          detCtx,
-          detCanvas,
-          {
-            label: "Tracking...",
-            confidence: trackResult.confidence,
-            box: [x1, y1, x2, y2],
-          },
-          region.width,
-          region.height,
-        );
-
-        detFPS = 1000 / (now - lastDetTime);
-        lastDetTime = now;
-      } else {
-        console.log("Tracker lost object");
-        isTrackingActive = false;
-        currentObjectCenter = null;
-        UI.clearCanvas(detCtx, detCanvas);
-      }
-    }
-  } catch (err) {
-    console.error("Tracking loop error:", err);
-  }
-
-  requestAnimationFrame(trackingLoop);
-}
-
-async function renderLoop() {
-  if (!isRunning) return requestAnimationFrame(renderLoop);
-
-  try {
-    if (webcam.readyState < 2) return requestAnimationFrame(renderLoop);
-
-    const now = performance.now();
-
-    // Optimization: Only run depth if object detected
-    if (!currentObjectCenter) {
-      UI.clearCanvas(depthCtx, depthCanvas);
-      if (distanceEl) distanceEl.innerText = "--";
-      sensor.update(0, false);
-      return requestAnimationFrame(renderLoop);
-    }
-
-    // 2. Depth Logic
-    const interval = 1000 / CONFIG.DEPTH_FPS_TARGET;
-    if (now - lastDepthTime >= interval) {
-      const depthPrediction = await depth.predict(webcam, camera.visibleRegion);
-      if (depthPrediction) {
-        // Update depth FPS
-        depthFPS = 1000 / (now - lastDepthTime);
-        lastDepthTime = now;
-
-        currentDepthData = depthPrediction.data;
-        const { width, height } = depthPrediction;
-
-        // Draw visual depth map
-        if (depthCanvas && depthPrediction.toCanvas) {
-          const visualCanvas = await depthPrediction.toCanvas();
-          if (
-            depthCanvas.width !== visualCanvas.width ||
-            depthCanvas.height !== visualCanvas.height
-          ) {
-            depthCanvas.width = visualCanvas.width;
-            depthCanvas.height = visualCanvas.height;
-          }
-          depthCtx.drawImage(visualCanvas, 0, 0);
-        }
-
-        // Update distance and sensor
-        if (currentObjectCenter) {
-          const tx = Math.floor(currentObjectCenter.x * width);
-          const ty = Math.floor(currentObjectCenter.y * height);
-          const idx = Math.max(
-            0,
-            Math.min(width * height - 1, ty * width + tx),
-          );
-          const val = currentDepthData[idx];
-
-          if (distanceEl) distanceEl.innerText = val.toFixed(3);
-          sensor.update(val, true);
-        } else {
-          sensor.update(0, false);
-        }
-      }
-    }
-
-    // Periodically update UI stats
-    if (now - lastUIPdateTime > 500) {
-      UI.updateFPS(depthFPS, detFPS);
-      lastUIPdateTime = now;
-    }
-  } catch (err) {
-    console.error("Render loop error:", err);
-  }
-
-  requestAnimationFrame(renderLoop);
 }
 
 const main = new AR();

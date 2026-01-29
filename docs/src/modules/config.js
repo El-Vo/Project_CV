@@ -4,7 +4,7 @@ export const CONFIG = {
   DEPTH_MODEL: "onnx-community/depth-anything-v2-small",
   DEPTH_WIDTH: 84,
   DEPTH_HEIGHT: 84,
-  DEPTH_FPS_TARGET: 15,
+  DEPTH_FPS_TARGET: 10,
   DETECTION_FPS_TARGET: 1,
   DETECTION_SHORT_SIDE_PX: 480,
   AUDIO_BEEP_FREQ: 800,
