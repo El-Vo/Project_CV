@@ -86,7 +86,7 @@ export class AR {
     }
 
     //Clear bounding boxes if no text input is given and stop audio
-    if (UI.getTextPrompt() == "") {
+    if (!CONFIG.LOCAL_MODE && UI.getTextPrompt() == "") {
       this.tracker.clearCanvas();
       this.sensor.stop();
     }
@@ -153,7 +153,8 @@ export class AR {
 
     if (
       this.#countOfSuccessfulTrackingiterations >
-      2 * CONFIG.TRACKER_FPS_TARGET
+        2 * CONFIG.TRACKER_FPS_TARGET &&
+      !CONFIG.LOCAL_MODE
     ) {
       this.#isTracking = false;
       this.#countOfSuccessfulTrackingiterations = 0;
