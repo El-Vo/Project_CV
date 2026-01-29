@@ -64,8 +64,11 @@ export class Detection extends CanvasManager2d {
     ];
   }
 
-  detectObject() {
-    return detectObjectAPI(UI.getTextPrompt(), this.canvas.toBlob());
+  async detectObject(image_jpg_blob) {
+    const response = await detectObjectAPI(UI.getTextPrompt(), image_jpg_blob);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.detection;
   }
 
   getDetectionStatus() {

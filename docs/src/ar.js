@@ -21,6 +21,7 @@ let lastUIPdateTime = 0;
 
 export class AR {
   #lastDetectionTimestamp = 0;
+  #isDetecting = false;
 
   webcam = document.getElementById("webcam");
   depthCanvas = document.getElementById("depth-canvas");
@@ -44,7 +45,6 @@ export class AR {
 
     // Update visible region on window resize
     window.addEventListener("resize", () => {
-      console.log("Window resized!");
       this.updateCanvasDimensions();
     });
   }
@@ -52,21 +52,40 @@ export class AR {
   loop() {
     // Object detection step
     if (
+      !this.#isDetecting &&
       this.detector.getDetectionStatus() &&
       performance.now() >
-        this.#lastDetectionTimestamp + 1000 / CONFIG.DETECTION_FPS
+        this.#lastDetectionTimestamp + 1000 / CONFIG.DETECTION_FPS_TARGET
     ) {
+      this.updateObjectDetection();
       this.#lastDetectionTimestamp = performance.now();
     }
 
-    //restart loop continously
-    this.loop();
+    requestAnimationFrame(() => this.loop());
+  }
+
+  async updateObjectDetection() {
+    this.#isDetecting = true;
+    try {
+      const imgBlob = await this.camera.takePicture();
+      const det = await this.detector.detectObject(imgBlob);
+      if (det.box) {
+        det.box = this.camera.translateBoundingBoxToWindowScaling(det.box);
+        this.detector.drawDetection(det);
+      }
+    } catch (err) {
+      console.error("Detection error:", err);
+    } finally {
+      this.#isDetecting = false;
+    }
   }
 
   updateCanvasDimensions() {
     const visibleRegion = this.camera.updateVisibleRegion();
-    console.log(visibleRegion);
-    this.camera.setDimensionsAndPosition(window.innerWidth, window.innerHeight);
+    this.camera.setDimensionsAndPosition(
+      this.camera.visibleRegion.width,
+      this.camera.visibleRegion.height,
+    );
     this.detector.setDimensionsAndPosition(
       window.innerWidth,
       window.innerHeight,
@@ -164,7 +183,7 @@ async function renderLoop() {
     }
 
     // 2. Depth Logic
-    const interval = 1000 / CONFIG.DEPTH_FPS;
+    const interval = 1000 / CONFIG.DEPTH_FPS_TARGET;
     if (now - lastDepthTime >= interval) {
       const depthPrediction = await depth.predict(webcam, camera.visibleRegion);
       if (depthPrediction) {
@@ -219,3 +238,4 @@ async function renderLoop() {
 }
 
 const main = new AR();
+main.loop();
