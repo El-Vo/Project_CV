@@ -11,7 +11,7 @@ export class UI {
   static setLocalMode(mode = CONFIG.LOCAL_MODE) {
     this.promptInput.style.display = mode ? "none" : "flex";
     this.controlsBottom.style.display = mode ? "none" : "flex";
-    this.toggleDetBtn.style.display = mode ? "none" : "flex";
+    /* this.toggleDetBtn.style.display = mode ? "none" : "flex"; */
   }
 
   static toggleDetectionUI(isDetectionRunning) {

@@ -1,7 +1,9 @@
 export class CanvasManager2d {
   constructor(canvas) {
     this.canvas = canvas;
-    this.ctx = this.canvas.getContext("2d");
+    this.ctx = this.canvas.getContext("2d", {
+      willReadFrequently: true,
+    });
   }
 
   clearCanvas() {

@@ -3,16 +3,12 @@ import { CameraHandler } from "./modules/camera.js";
 import { DepthEstimator } from "./modules/depth.js";
 import { ParkingSensor } from "./modules/audio.js";
 import { UI } from "./modules/ui.js";
-import { Detection } from "./modules/detection.js";
+import { RemoteDetection } from "./modules/remoteDetection.js";
 import { FeatureTracker } from "./modules/tracking.js";
+import { TapDetection } from "./modules/tapDetection.js";
 
 // Handlers & State
 const depth = new DepthEstimator(CONFIG.DEPTH_MODEL);
-const tracker = new FeatureTracker();
-
-let isRunning = false;
-let isTrackingActive = false;
-let currentObjectCenter = null;
 
 // FPS Tracking
 let lastDepthTime = performance.now();
@@ -21,7 +17,10 @@ let lastUIPdateTime = 0;
 
 export class AR {
   #lastDetectionTimestamp = 0;
+  #lastTrackingTimestamp = 0;
+  #countOfSuccessfulTrackingiterations = 0;
   #isDetecting = false;
+  #isTracking = false;
 
   webcam = document.getElementById("webcam");
   depthCanvas = document.getElementById("depth-canvas");
@@ -29,19 +28,19 @@ export class AR {
   detectionCanvas = document.getElementById("detection-canvas");
 
   constructor() {
-    UI.setLocalMode();
-
     this.camera = new CameraHandler(this.webcam, this.captureCanvas);
     this.camera.start().then(() => {
       this.updateCanvasDimensions();
     });
 
-    this.detector = new Detection(this.detectionCanvas);
+    if (CONFIG.LOCAL_MODE) {
+      this.detector = new TapDetection(this.detectionCanvas);
+      UI.setLocalMode(true);
+    } else {
+      this.detector = new RemoteDetection();
+    }
 
-    UI.toggleDetBtn.addEventListener("click", () => {
-      this.detector.toggleDetection();
-      UI.toggleDetectionUI(this.detector.getDetectionStatus());
-    });
+    this.tracker = new FeatureTracker(this.detectionCanvas);
 
     // Update visible region on window resize
     window.addEventListener("resize", () => {
@@ -53,12 +52,28 @@ export class AR {
     // Object detection step
     if (
       !this.#isDetecting &&
-      this.detector.getDetectionStatus() &&
+      !this.#isTracking &&
+      !CONFIG.LOCAL_MODE &&
+      UI.getTextPrompt() != "" &&
       performance.now() >
         this.#lastDetectionTimestamp + 1000 / CONFIG.DETECTION_FPS_TARGET
     ) {
       this.updateObjectDetection();
       this.#lastDetectionTimestamp = performance.now();
+    }
+
+    //Object tracking step
+    if (
+      performance.now() >
+      this.#lastTrackingTimestamp + 1000 / CONFIG.TRACKER_FPS_TARGET
+    ) {
+      this.updateTracking();
+      this.#lastTrackingTimestamp = performance.now();
+    }
+
+    //Clear bounding boxes if no text input is given
+    if (UI.getTextPrompt() == "") {
+      this.tracker.clearCanvas();
     }
 
     requestAnimationFrame(() => this.loop());
@@ -67,16 +82,62 @@ export class AR {
   async updateObjectDetection() {
     this.#isDetecting = true;
     try {
-      const imgBlob = await this.camera.takePicture();
-      const det = await this.detector.detectObject(imgBlob);
-      if (det.box) {
-        det.box = this.camera.translateBoundingBoxToWindowScaling(det.box);
-        this.detector.drawDetection(det);
-      }
+      const imgBlob = await this.camera.takePictureResized();
+      await this.detector.detectObject(imgBlob);
     } catch (err) {
       console.error("Detection error:", err);
     } finally {
       this.#isDetecting = false;
+    }
+  }
+
+  updateTracking() {
+    let detection = this.detector.getCurrentBoundingBox();
+
+    if (detection != null && detection.box) {
+      // Since local mode gets bounding boxes based on the detection canvas
+      // and not from the picture itself, we must account for that
+      if (CONFIG.LOCAL_MODE) {
+        detection.box = this.camera.translateBoundingBoxToPictureScaling(
+          detection.box,
+        );
+        // Scale to resized coordinates for tracking
+        detection.box = this.camera.scaleBoundingBoxToResized(detection.box);
+      }
+
+      this.#isTracking = this.tracker.init(
+        this.camera.takePictureResized(false),
+        detection.box,
+      );
+    }
+
+    if (this.#isTracking) {
+      // Use resized picture for tracking to match initialization
+      detection = this.tracker.track(this.camera.takePictureResized(false));
+      if (detection == null) {
+        this.#isTracking = false;
+        this.#countOfSuccessfulTrackingiterations = 0;
+        this.tracker.clearCanvas();
+      } else {
+        // Scale back up from resized coordinates to full picture coordinates
+        detection.box = this.camera.scaleBoundingBoxFromResized(detection.box);
+
+        detection.box = this.camera.translateBoundingBoxToWindowScaling(
+          detection.box,
+        );
+
+        this.tracker.drawDetection(detection);
+
+        this.#countOfSuccessfulTrackingiterations++;
+      }
+    }
+
+    if (
+      this.#countOfSuccessfulTrackingiterations >
+      2 * CONFIG.TRACKER_FPS_TARGET
+    ) {
+      this.#isTracking = false;
+      this.#countOfSuccessfulTrackingiterations = 0;
     }
   }
 
@@ -86,7 +147,7 @@ export class AR {
       this.camera.visibleRegion.width,
       this.camera.visibleRegion.height,
     );
-    this.detector.setDimensionsAndPosition(
+    this.tracker.setDimensionsAndPosition(
       window.innerWidth,
       window.innerHeight,
     );
@@ -105,17 +166,6 @@ async function init() {
   console.log("Basic services ready, loading depth model...");
 
   depth.init();
-
-  // Improved OpenCV loading check
-  if (typeof cv !== "undefined") {
-    if (cv.Mat) {
-      console.log("OpenCV.js already ready");
-    } else {
-      cv.onRuntimeInitialized = () => {
-        console.log("OpenCV.js is ready via onRuntimeInitialized");
-      };
-    }
-  }
 
   console.log("App initialization sequence complete.");
 }

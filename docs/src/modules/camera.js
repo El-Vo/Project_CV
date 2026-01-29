@@ -84,6 +84,14 @@ export class CameraHandler extends CanvasManager2d {
     return visibleRegionY / this.visibleRegionToWindowsYFactor;
   }
 
+  translateVisibleRegionToPictureX(visibleRegionX) {
+    return visibleRegionX * this.visibleRegionToWindowXFactor;
+  }
+
+  translateVisibleRegionToPictureY(visibleRegionY) {
+    return visibleRegionY * this.visibleRegionToWindowsYFactor;
+  }
+
   translateBoundingBoxToWindowScaling(box) {
     let [x1, y1, x2, y2] = box;
     return [
@@ -94,7 +102,49 @@ export class CameraHandler extends CanvasManager2d {
     ];
   }
 
-  takePicture() {
+  translateBoundingBoxToPictureScaling(box) {
+    let [x1, y1, x2, y2] = box;
+    return [
+      this.translateVisibleRegionToPictureX(x1),
+      this.translateVisibleRegionToPictureY(y1),
+      this.translateVisibleRegionToPictureX(x2),
+      this.translateVisibleRegionToPictureY(y2),
+    ];
+  }
+
+  getResizeScaleFactor(shortSideTarget = CONFIG.DETECTION_SHORT_SIDE_PX) {
+    if (this.visibleRegion.width === 0 || this.visibleRegion.height === 0)
+      return 1;
+    const { width, height } = this.visibleRegion;
+    const isPortrait = width < height;
+
+    const targetWidth = isPortrait
+      ? shortSideTarget
+      : (width / height) * shortSideTarget;
+
+    return targetWidth / width;
+  }
+
+  scaleBoundingBoxToResized(box) {
+    const scale = this.getResizeScaleFactor();
+    return box.map((c) => c * scale);
+  }
+
+  scaleBoundingBoxFromResized(box) {
+    const scale = this.getResizeScaleFactor();
+    if (scale === 0) return box;
+    return box.map((c) => c / scale);
+  }
+
+  takePicture(return_blob = true) {
+    if (
+      this.canvas.width !== this.visibleRegion.width ||
+      this.canvas.height !== this.visibleRegion.height
+    ) {
+      this.canvas.width = this.visibleRegion.width;
+      this.canvas.height = this.visibleRegion.height;
+    }
+
     this.ctx.drawImage(
       this.video,
       this.visibleRegion.x,
@@ -106,6 +156,15 @@ export class CameraHandler extends CanvasManager2d {
       this.visibleRegion.width,
       this.visibleRegion.height,
     );
+
+    if (return_blob) {
+      return this.turnPictureCanvasToBlob();
+    } else {
+      return this.canvas;
+    }
+  }
+
+  turnPictureCanvasToBlob() {
     return new Promise((resolve) => {
       this.canvas.toBlob(
         (blob) => {
@@ -117,7 +176,10 @@ export class CameraHandler extends CanvasManager2d {
     });
   }
 
-  takePictureResized(shortSideTarget = CONFIG.DETECTION_SHORT_SIDE_PX) {
+  takePictureResized(
+    return_blob = true,
+    shortSideTarget = CONFIG.DETECTION_SHORT_SIDE_PX,
+  ) {
     const { width, height } = this.visibleRegion;
     const isPortrait = width < height;
 
@@ -143,14 +205,10 @@ export class CameraHandler extends CanvasManager2d {
       targetHeight,
     );
 
-    return new Promise((resolve) => {
-      this.canvas.toBlob(
-        (blob) => {
-          resolve(blob);
-        },
-        "image/jpeg",
-        0.9,
-      );
-    });
+    if (return_blob) {
+      return this.turnPictureCanvasToBlob();
+    } else {
+      return this.canvas;
+    }
   }
 }
