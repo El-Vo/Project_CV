@@ -1,6 +1,11 @@
 # Server / API Helpers
 
-Optional server-side helpers for running inference proxies, coordinating level-of-service fallbacks, or hosting telemetry.
+This server provides only the API for object detection.
 
-- `api/`: HTTP/Edge endpoints (model proxy, usage reporting, user prompts).
-- `utils/`: shared helpers (caching, config, security).
+## API Endpoints
+- `POST /detect`: Accepts an image and a prompt and returns the detection results.
+
+## Execution
+```bash
+uvicorn server.api.app:app --host 0.0.0.0 --port 8000 --reload
+```
