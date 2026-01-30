@@ -56,7 +56,6 @@ class ObjectScanner:
            print(f"✓ Created new empty database (will save to {self.db_folder})")
 
     # Function to save FAISS index and mapping in json
-      # Function to save FAISS index and mapping in json
     def save_to_database(self):
         os.makedirs(self.db_folder, exist_ok=True)
         faiss.write_index(self.index, os.path.join(self.db_folder, "index.faiss"))

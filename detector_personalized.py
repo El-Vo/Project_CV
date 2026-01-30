@@ -10,54 +10,45 @@ from transformers import AutoImageProcessor, AutoModel
 from PIL import Image
 from ultralytics import FastSAM
 
-
+#Initialize the Object Recognizer with FAISS database
 class ObjectRecognizer:
     def __init__(self, db_folder="faiss_db", device=None):
-        """
-        Initialize the Object Recognizer with FAISS database
         
-        Args:
-            db_folder: Path to the FAISS database folder
-            device: Device to run models on (cuda/cpu)
-        """
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         self.db_folder = db_folder
         
         print(f"Using device: {self.device}")
         
         # Initialize models
-        self._load_models()
-        
+        print("Loading FastSAM model...")
+        self.fastsam = FastSAM("FastSAM-s.pt")
+        self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-small")
+        self.dino_model = AutoModel.from_pretrained("facebook/dinov2-small").to(self.device)
+        self.dino_model.eval()
+        print("✓ Models loaded successfully")
         # Load FAISS database
         self._load_database()
         
+        """
         # Tracking variables
         self.tracker = None
         self.tracking_active = False
         self.tracked_box = None
         self.tracked_object_name = None
-        
+        """
+
         # Re-identification settings
-        self.SIM_THRESHOLD = 0.6
+        self.SIM_THRESHOLD = 0.6 # similarity threshold for confident ID: Object accepted if avg similarity > threshold
         self.REID_INTERVAL = 2.0  # seconds between re-ID attempts
         self.last_reid_time = 0
-        
-    def _load_models(self):
-        """Load FastSAM and DINOv2 models"""
-        print("Loading FastSAM model...")
-        self.fastsam = FastSAM("FastSAM-s.pt")
-        
-        print("Loading DINOv2 model...")
-        self.processor = AutoImageProcessor.from_pretrained("facebook/dinov2-small")
-        self.dino_model = AutoModel.from_pretrained("facebook/dinov2-small").to(self.device)
-        self.dino_model.eval()
-        print("✓ Models loaded successfully")
-        
-    def _load_database(self):
-        """Load FAISS database and object mappings"""
+
+
+    #Load FAISS database and object mappings: do in jscript?
+    def _load_database(self):   
         index_path = os.path.join(self.db_folder, "index.faiss")
         map_path = os.path.join(self.db_folder, "map.json")
         
+        #Error handling if database does not exist, eventually do in jscript
         if not os.path.exists(index_path) or not os.path.exists(map_path):
             raise FileNotFoundError(
                 f"FAISS database not found in {self.db_folder}. "
@@ -79,16 +70,8 @@ class ObjectRecognizer:
             count = self.id_to_name.count(obj)
             print(f"    • '{obj}': {count} perspective{'s' if count != 1 else ''}")
     
+    #Extract DINOv2 features from a cropped image
     def extract_dino_features(self, crop_image):
-        """
-        Extract DINOv2 features from a cropped image
-        
-        Args:
-            crop_image: BGR image (numpy array)
-            
-        Returns:
-            Normalized feature vector (numpy array)
-        """
         # Convert BGR to RGB
         img_rgb = cv2.cvtColor(crop_image, cv2.COLOR_BGR2RGB)
         img_pil = Image.fromarray(img_rgb)
@@ -104,17 +87,8 @@ class ObjectRecognizer:
         
         return feat.cpu().numpy().astype('float32')
     
-    def identify_object_from_mask(self, frame, mask):
-        """
-        Identify object using FAISS database
-        
-        Args:
-            frame: Full frame (BGR image)
-            mask: Boolean mask of the object
-            
-        Returns:
-            dict with 'name', 'score', 'bbox', or None if not confident
-        """
+    #Given a mask, extract object and identify using FAISS, return best match, avg score, bbox
+    def identify_object(self, frame, mask):
         # Get bounding box from mask
         ys, xs = np.where(mask)
         if len(xs) == 0 or len(ys) == 0:
@@ -137,100 +111,86 @@ class ObjectRecognizer:
         if crop.size == 0:
             return None
         
-        # Extract DINO features
+        # Extract features
         candidate_feat = self.extract_dino_features(crop)
         
-        # Search in FAISS (find k nearest neighbors)
-        k = min(5, self.index.ntotal)  # Get top 5 matches
-        distances, indices = self.index.search(candidate_feat, k)
+        # Search FAISS for the closest neighbor
+        distances, indices = self.index.search(candidate_feat, 1)
         
-        # Convert L2 distances to similarity scores (smaller distance = higher similarity)
-        # Similarity = 1 / (1 + distance)
-        similarities = 1.0 / (1.0 + distances[0])
+        # FAISS returns arrays, get the first values
+        dist = distances[0][0]
+        idx = indices[0][0]
         
-        # Vote on the best match
-        votes = {}
-        for idx, sim in zip(indices[0], similarities):
-            if idx < len(self.id_to_name):
-                obj_name = self.id_to_name[idx]
-                if obj_name not in votes:
-                    votes[obj_name] = []
-                votes[obj_name].append(sim)
+        # Convert L2 distance to Similarity (0 to 1 scale)
+        # L2 distance is the straight-line distance between vectors
+        similarity = 1.0 / (1.0 + dist)
         
-        # Get object with highest average similarity
-        if votes:
-            best_object = max(votes.items(), key=lambda x: np.mean(x[1]))
-            obj_name, sims = best_object
-            avg_score = np.mean(sims)
-            
-            return {
-                'name': obj_name,
-                'score': avg_score,
-                'bbox': (x1, y1, w, h)
-            }
-        
-        return None
-    
-    def run_identification_cycle(self, frame):
-        """
-        Run FastSAM + FAISS identification on current frame
-        
-        Args:
-            frame: Current video frame (BGR)
-            
-        Returns:
-            Best match dict or None
-        """
-        print("\nRunning FastSAM + FAISS identification...")
-        total_start = time.time()
-        
-        # Run FastSAM
-        t_fastsam = time.time()
-        results = self.fastsam(
-            frame,
-            device=self.device,
-            imgsz=640,
-            conf=0.4,
-            iou=0.9,
-            retina_masks=True
-        )
-        print(f"  FastSAM time: {time.time() - t_fastsam:.3f}s")
-        
-        masks_obj = results[0].masks
-        if masks_obj is None:
-            print("  No masks found")
+        # Return nothing if below threshold
+        if similarity < self.SIM_THRESHOLD:
             return None
-        
-        masks_tensor = masks_obj.data
-        print(f"  FastSAM masks found: {masks_tensor.shape[0]}")
-        
-        best_match = None
-        best_score = 0
-        
-        # Check each mask
-        for i in range(masks_tensor.shape[0]):
-            mask = masks_tensor[i].detach().cpu().numpy().astype(bool)
             
-            # Identify object
-            result = self.identify_object_from_mask(frame, mask)
-            
-            if result and result['score'] > best_score:
-                best_score = result['score']
-                best_match = result
-        
-        print(f"  Total identification time: {time.time() - total_start:.3f}s")
-        
-        if best_match:
-            print(f"  Best match: '{best_match['name']}' (score={best_match['score']:.3f})")
-        else:
-            print(f"  No confident match found")
-        
-        return best_match
+        # Return the match
+        obj_name = self.id_to_name[idx]
+        return {
+            'name': obj_name,
+            'score': similarity,
+            'bbox': (x1, y1, w, h)
+        }
     
+    #Run FastSAM + FAISS identification on current frame, this cycle needs to be called periodically
+    def run_identification_cycle(self, frame):
+            print("\nRunning FastSAM + FAISS identification...")
+            total_start = time.time() #delete later
+            
+            # Run FastSAM to segment all objects in the frame
+            t_fastsam = time.time() #delete later
+            results = self.fastsam(
+                frame,
+                device=self.device,
+                imgsz=640,
+                conf=0.4,
+                iou=0.9,
+                retina_masks=True
+            )
+            print(f"  FastSAM time: {time.time() - t_fastsam:.3f}s") #delete later
+            
+            masks_obj = results[0].masks
+            if masks_obj is None:
+                print("  No masks found")
+                return None
+            
+            masks_tensor = masks_obj.data
+            print(f"  FastSAM masks found: {masks_tensor.shape[0]}")
+            
+            best_match = None #closeest match across all masks
+            best_score = 0 #highest score across all masks
+            
+            # Check each mask against the database
+            for i in range(masks_tensor.shape[0]):
+                mask = masks_tensor[i].detach().cpu().numpy().astype(bool)
+                
+                # Calls identify_object to check this mask
+                result = self.identify_object(frame, mask)
+                
+                # Update the best match if the result is bigger than threshold and more confident than previous best
+                if result and result['score'] > best_score:
+                    best_score = result['score']
+                    best_match = result
+            
+            print(f"  Total identification time: {time.time() - total_start:.3f}s") #delete later
+            
+            # Final output check
+            if best_match: #if we found a match with sufficient confidence
+                print(f"  Best match: '{best_match['name']}' (score={best_match['score']:.3f})")
+            else: #otherwise no match found, run id cycle again later
+                print(f"  No confident match found")
+            
+            return best_match
+    
+
+    #Webcam loop for recognition
+    """
     def run_recognition(self):
-        """
-        Main loop for object recognition and tracking
-        """
         cap = cv2.VideoCapture(0)
         window_name = "Object Recognition"
         cv2.namedWindow(window_name)
@@ -301,7 +261,7 @@ class ObjectRecognizer:
         cap.release()
         cv2.destroyAllWindows()
         print("\nRecognition stopped")
-
+        """
 
 if __name__ == "__main__":
     recognizer = ObjectRecognizer(db_folder="faiss_db")
