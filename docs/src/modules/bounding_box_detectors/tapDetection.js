@@ -1,4 +1,3 @@
-import { CanvasManager2d } from "./CanvasManager2d.js";
 import { Detector } from "./detector.js";
 
 export class TapDetection extends Detector {
@@ -19,7 +18,7 @@ export class TapDetection extends Detector {
 
     this.objectDetected = {
       box: this.calculateTapBoxCoordinates(event.clientX, event.clientY),
-      confidence: 1,
+      score: 1,
       label: "Manual",
     };
 
@@ -32,7 +31,7 @@ export class TapDetection extends Detector {
     this.ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
 
     this.ctx.fillStyle = "#32c8ff";
-    const label = `${this.objectDetected.label} (${Math.round(this.objectDetected.confidence * 100)}%)`;
+    const label = `${this.objectDetected.label} (${Math.round(this.objectDetected.score * 100)}%)`;
     this.ctx.font = "bold 18px Arial";
     this.ctx.fillRect(x1, y1 - 25, this.ctx.measureText(label).width + 10, 25);
     this.ctx.fillStyle = "black";

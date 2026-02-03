@@ -21,7 +21,7 @@ export class CanvasManager2d {
     this.ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
 
     this.ctx.fillStyle = "#32c8ff";
-    const label = `${det.label} (${Math.round(det.confidence * 100)}%)`;
+    const label = `${det.label} (${Math.round(det.score * 100)}%)`;
     this.ctx.font = "bold 18px Arial";
     this.ctx.fillRect(x1, y1 - 25, this.ctx.measureText(label).width + 10, 25);
     this.ctx.fillStyle = "black";

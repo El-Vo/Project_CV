@@ -3,10 +3,11 @@ import { CameraHandler } from "./modules/camera.js";
 import { DepthEstimator } from "./modules/depth.js";
 import { ParkingSensor } from "./modules/audio.js";
 import { UI } from "./modules/ui.js";
-import { RemoteDetection } from "./modules/remoteDetection.js";
-import { FeatureTracker } from "./modules/tracking.js";
-import { TapDetection } from "./modules/tapDetection.js";
-import { DepthUIController } from "./modules/depthUI.js";
+import { RemoteGenericDetection } from "./modules/bounding_box_detectors/remoteGenericDetection.js";
+import { RemotePersonalizedDetection } from "./modules/bounding_box_detectors/remotePersonalizedDetection.js";
+import { FeatureTracker } from "./modules/display/tracking.js";
+import { TapDetection } from "./modules/bounding_box_detectors/tapDetection.js";
+import { DepthUIController } from "./modules/display/depthUI.js";
 
 export class AR {
   #lastDetectionTimestamp = 0;
@@ -32,8 +33,11 @@ export class AR {
     if (CONFIG.LOCAL_MODE) {
       this.detector = new TapDetection(this.detectionCanvas);
       UI.setLocalMode(true);
+    } else if (CONFIG.PERSONALIZED_MODE) {
+      this.detector = new RemotePersonalizedDetection();
+      UI.setLocalMode(true);
     } else {
-      this.detector = new RemoteDetection();
+      this.detector = new RemoteGenericDetection();
     }
 
     this.tracker = new FeatureTracker(this.detectionCanvas);
@@ -57,7 +61,7 @@ export class AR {
       !this.#isDetecting &&
       !this.#isTracking &&
       !CONFIG.LOCAL_MODE &&
-      UI.getTextPrompt() != "" &&
+      (UI.getTextPrompt() != "" || CONFIG.PERSONALIZED_MODE) &&
       performance.now() >
         this.#lastDetectionTimestamp + 1000 / CONFIG.DETECTION_FPS_TARGET
     ) {
@@ -86,7 +90,11 @@ export class AR {
     }
 
     //Clear bounding boxes if no text input is given and stop audio
-    if (!CONFIG.LOCAL_MODE && UI.getTextPrompt() == "") {
+    if (
+      !CONFIG.LOCAL_MODE &&
+      !CONFIG.PERSONALIZED_MODE &&
+      UI.getTextPrompt() == ""
+    ) {
       this.tracker.clearCanvas();
       this.sensor.stop();
     }

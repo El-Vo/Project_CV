@@ -1,5 +1,5 @@
 import { CanvasManager2d } from "./CanvasManager2d.js";
-import { UI } from "./ui.js";
+import { UI } from "../ui.js";
 
 export class DepthUIController extends CanvasManager2d {
   constructor(canvas) {

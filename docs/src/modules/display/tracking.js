@@ -1,5 +1,5 @@
 import { CanvasManager2d } from "./CanvasManager2d.js";
-import { CONFIG } from "./config.js";
+import { CONFIG } from "../config.js";
 
 /**
  * FeatureTracker using OpenCV.js KCF (Kernelized Correlation Filters) or MIL.
@@ -180,7 +180,7 @@ export class FeatureTracker extends CanvasManager2d {
 
       return {
         box: this.currentBox,
-        confidence: validCount / 50,
+        score: validCount / 50,
         label: "Manual",
       };
     } catch (err) {
