@@ -16,11 +16,11 @@ export class TapDetection extends Detector {
   getDetectionFromTap(event) {
     console.log("Tap detected, X: " + event.clientX + " Y: " + event.clientY);
 
-    this.objectDetected = {
-      box: this.calculateTapBoxCoordinates(event.clientX, event.clientY),
-      score: 1,
-      label: "Manual",
-    };
+    this.objectDetected = Detector.getDefaultBoundingBox();
+    this.objectDetected.box = this.calculateTapBoxCoordinates(
+      event.clientX,
+      event.clientY,
+    );
 
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 

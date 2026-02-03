@@ -1,9 +1,10 @@
 import { CanvasManager2d } from "../display/CanvasManager2d.js";
 import { Detector } from "../detector.js";
 
-export class SAMDetection extends Detector,CanvasManager2d {
+export class SAMDetection extends Detector {
   constructor(canvas) {
-    super(canvas);
+    super();
+    this.canvasManager = new CanvasManager2d(canvas);
     this.handleTap = (e) => this.startDetectionFromTap(e);
     this.canvas.addEventListener("click", this.handleTap);
     this.canvas.style.pointerEvents = "auto"; // Enable clicks
@@ -12,6 +13,7 @@ export class SAMDetection extends Detector,CanvasManager2d {
   }
 
   initiateRedDot() {
+    this.canvasManager.drawCenteredBox();
   }
 
   getBoundingBoxFromSAM() {
@@ -23,6 +25,5 @@ export class SAMDetection extends Detector,CanvasManager2d {
     console.log("Tap detected, X: " + event.clientX + " Y: " + event.clientY);
 
     this.getBoundingBoxFromSAM();
-
   }
 }

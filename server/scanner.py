@@ -117,6 +117,34 @@ class ObjectScanner:
         self.id_to_name.append(label)
         return True
 
+    def get_bounding_box_from_sam(self, frame, center_x, center_y):
+        """Use SAM to segment object at center point and derive bounding box.
+
+        Args:
+            frame: Input video frame (BGR)
+            center_x: X coordinate of center point
+            center_y: Y coordinate of center point
+
+        Returns:
+            Tuple (x, y, w, h) or None if segmentation fails
+        """
+        self.predictor.set_image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        pts = np.array([[center_x, center_y]])
+        labels = np.array([1])
+        masks, _, _ = self.predictor.predict(
+            point_coords=pts, point_labels=labels, multimask_output=True
+        )
+        mask_bool = masks[0].astype(bool)
+
+        # Derive bounding box from mask
+        y_idx, x_idx = np.where(mask_bool)
+        if len(y_idx) > 0 and len(x_idx) > 0:
+            x_min, x_max = x_idx.min(), x_idx.max()
+            y_min, y_max = y_idx.min(), y_idx.max()
+            bbox = (x_min, y_min, x_max - x_min, y_max - y_min)
+            return bbox
+        return None
+
     # Function to run the scanning process
     def run_scanning(self):
         name = input("Enter object name to record: ")
@@ -157,23 +185,8 @@ class ObjectScanner:
                 # Initialize tracker with SAM segmentation on first SPACE press
                 if key == 32:  # SPACE
                     print("Initializing tracker with SAM segmentation...")
-
-                    # Use SAM to segment object at center point
-                    self.predictor.set_image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                    pts = np.array([[center_x, center_y]])
-                    labels = np.array([1])
-                    masks, _, _ = self.predictor.predict(
-                        point_coords=pts, point_labels=labels, multimask_output=True
-                    )
-                    mask_bool = masks[0].astype(bool)
-
-                    # Derive bounding box from mask
-                    y_idx, x_idx = np.where(mask_bool)
-                    if len(y_idx) > 0 and len(x_idx) > 0:
-                        x_min, x_max = x_idx.min(), x_idx.max()
-                        y_min, y_max = y_idx.min(), y_idx.max()
-                        bbox = (x_min, y_min, x_max - x_min, y_max - y_min)
-
+                    bbox = self.get_bounding_box_from_sam(frame, center_x, center_y)
+                    if bbox:
                         # Initialize tracker with SAM-derived bbox
                         tracker = cv2.TrackerCSRT_create()
                         tracker.init(frame, bbox)

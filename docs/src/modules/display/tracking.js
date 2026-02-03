@@ -1,5 +1,6 @@
 import { CanvasManager2d } from "./CanvasManager2d.js";
 import { CONFIG } from "../config.js";
+import { Detector } from "../bounding_box_detectors/detector.js";
 
 /**
  * FeatureTracker using OpenCV.js KCF (Kernelized Correlation Filters) or MIL.
@@ -178,11 +179,11 @@ export class FeatureTracker extends CanvasManager2d {
       frame.delete();
       nextPoints.delete();
 
-      return {
-        box: this.currentBox,
-        score: validCount / 50,
-        label: "Manual",
-      };
+      detection = Detector.getDefaultBoundingBox();
+      detection.box = this.currentBox;
+      detection.score = validCount / 50;
+
+      return detection;
     } catch (err) {
       console.error("Tracking Update Error:", err);
       return null;
