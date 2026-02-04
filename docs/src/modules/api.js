@@ -22,3 +22,27 @@ export const detectPersonalizedObjectAPI = (image_blob) => {
     return {};
   });
 };
+
+export const getBoundingBoxFromCoordAPI = (x, y, image_blob) => {
+  const formData = new FormData();
+  formData.append("file", image_blob, "frame.jpg");
+  formData.append("x", x);
+  formData.append("y", y);
+
+  return fetch(CONFIG.API_URL + CONFIG.GET_BBOX_PATH, {
+    method: "POST",
+    body: formData,
+  });
+};
+
+export const saveToFaissAPI = (bbox, label, image_blob) => {
+  const formData = new FormData();
+  formData.append("file", image_blob, "frame.jpg");
+  formData.append("bbox", JSON.stringify(bbox));
+  formData.append("label", label);
+
+  return fetch(CONFIG.API_URL + CONFIG.SAVE_TO_FAISS_PATH, {
+    method: "POST",
+    body: formData,
+  });
+};

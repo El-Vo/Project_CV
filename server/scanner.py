@@ -141,7 +141,7 @@ class ObjectScanner:
         if len(y_idx) > 0 and len(x_idx) > 0:
             x_min, x_max = x_idx.min(), x_idx.max()
             y_min, y_max = y_idx.min(), y_idx.max()
-            bbox = (x_min, y_min, x_max - x_min, y_max - y_min)
+            bbox = [int(x_min), int(y_min), int(x_max - x_min), int(y_max - y_min)]
             return bbox
         return None
 

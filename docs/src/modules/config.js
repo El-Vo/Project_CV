@@ -4,6 +4,8 @@ export const CONFIG = {
   API_URL: "http://localhost:8000",
   GENERIC_DETECTION_PATH: "/detect",
   PERSONALIZED_DETECTION_PATH: "/detect_personalized",
+  GET_BBOX_PATH: "/get_bounding_box_from_coord",
+  SAVE_TO_FAISS_PATH: "/save_to_faiss",
   DEPTH_MODEL: "onnx-community/depth-anything-v2-small",
   DEPTH_WIDTH: 84,
   DEPTH_HEIGHT: 84,
