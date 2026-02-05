@@ -1,15 +1,7 @@
-import { CONFIG } from "./modules/config.js";
 import { CameraHandler } from "./modules/camera.js";
-import { DepthEstimator } from "./modules/depth.js";
-import { ParkingSensor } from "./modules/audio.js";
-import { UI } from "./modules/ui.js";
-import { RemoteGenericDetection } from "./modules/bounding_box_detectors/remoteGenericDetection.js";
-import { RemotePersonalizedDetection } from "./modules/bounding_box_detectors/remotePersonalizedDetection.js";
-import { FeatureTracker } from "./modules/display/tracking.js";
-import { TapDetection } from "./modules/bounding_box_detectors/tapDetection.js";
-import { DepthUIController } from "./modules/display/depthUI.js";
 import { DetectionLoop } from "./detectionLoop.js";
 import { ScanningLoop } from "./scanningLoop.js";
+import { UI } from "./modules/ui.js";
 
 export class AR {
   webcam = document.getElementById("webcam");
@@ -21,9 +13,8 @@ export class AR {
       this.updateCanvasDimensions();
     });
 
-    this.detectionLoop = new DetectionLoop();
-
-    this.scanningLoop = new ScanningLoop();
+    this.detectionLoop = new DetectionLoop(this.camera);
+    this.scanningLoop = new ScanningLoop(this.camera);
 
     // Update visible region on window resize
     window.addEventListener("resize", () => {
@@ -32,6 +23,11 @@ export class AR {
   }
 
   loop() {
+    if (UI.isScanningMode) {
+      this.scanningLoop.scanningLoopIteration();
+    } else {
+      this.detectionLoop.detectionLoopIteration();
+    }
     requestAnimationFrame(() => this.loop());
   }
 

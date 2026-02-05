@@ -1,5 +1,4 @@
 import { CONFIG } from "./modules/config.js";
-import { CameraHandler } from "./modules/camera.js";
 import { DepthEstimator } from "./modules/depth.js";
 import { ParkingSensor } from "./modules/audio.js";
 import { UI } from "./modules/ui.js";
@@ -28,7 +27,6 @@ export class DetectionLoop {
       UI.setLocalMode(true);
     } else if (CONFIG.PERSONALIZED_MODE) {
       this.detector = new RemotePersonalizedDetection();
-      UI.setLocalMode(true);
     } else {
       this.detector = new RemoteGenericDetection();
     }

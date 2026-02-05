@@ -71,11 +71,19 @@ async def save_to_faiss(
     image_np = np.array(image_pil)
     image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
 
-    # Convert bbox string to list [x, y, w, h]
+    # Convert bbox string to list
     try:
-        bbox_list = json.loads(bbox)
+        bbox_raw = json.loads(bbox)
     except:
-        bbox_list = [int(v) for v in bbox.split(",")]
+        bbox_raw = [int(v) for v in bbox.split(",")]
+
+    # Convert from [x1, y1, x2, y2] to [x, y, w, h]
+    bbox_list = [
+        bbox_raw[0],
+        bbox_raw[1],
+        bbox_raw[2] - bbox_raw[0],
+        bbox_raw[3] - bbox_raw[1],
+    ]
 
     success = object_scanner.process_and_store(image_bgr, bbox_list, label)
     if success:

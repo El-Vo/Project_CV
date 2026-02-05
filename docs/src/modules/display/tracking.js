@@ -1,5 +1,4 @@
 import { CanvasManager2d } from "./CanvasManager2d.js";
-import { CONFIG } from "../config.js";
 import { Detector } from "../bounding_box_detectors/detector.js";
 
 /**
