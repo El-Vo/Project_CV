@@ -1,8 +1,9 @@
-import { SAMDetection } from "./modules/bounding_box_detectors/samDetector";
-import { Detector } from "./modules/bounding_box_detectors/detector";
-import { FeatureTracker } from "./modules/display/tracking";
-import { CONFIG } from "./modules/config";
-import { PersonalObjectPicture } from "./modules/personalObjectPicture";
+import { SAMDetection } from "./modules/bounding_box_detectors/samDetector.js";
+import { Detector } from "./modules/bounding_box_detectors/detector.js";
+import { FeatureTracker } from "./modules/display/tracking.js";
+import { CONFIG } from "./modules/config.js";
+import { PersonalObjectPicture } from "./modules/personalObjectPicture.js";
+import { CameraHandler } from "./modules/camera.js";
 
 export class ScanningLoop {
   #lastTrackingTimestamp = 0;
@@ -10,16 +11,43 @@ export class ScanningLoop {
   #objectLabel = "scanned_object";
 
   detectionCanvas = document.getElementById("detection-canvas");
+  webcam = document.getElementById("webcam");
+  captureCanvas = document.getElementById("capture-canvas");
+  submitBtn = document.getElementById("submit-name-button");
+  nameInput = document.getElementById("object-name-input");
+  startTrackingBtn = document.getElementById("start-tracking-button");
 
-  constructor(camera) {
-    this.camera = camera;
+  constructor() {
+    this.camera = new CameraHandler(this.webcam, this.captureCanvas);
+    this.camera.start().then(() => {
+      this.updateCanvasDimensions();
+    });
     this.tracker = new FeatureTracker(this.detectionCanvas);
     this.detector = new SAMDetection(this.detectionCanvas);
     this.savePersonalizedPicture = new PersonalObjectPicture();
-    this.detectionCanvas.addEventListener("click", this.analyzeTap);
+
+    this.initializeUI();
   }
 
-  scanningLoopIteration() {
+  initializeUI() {
+    this.submitBtn.addEventListener("click", () => {
+      const name = this.nameInput.value.trim();
+      if (name) {
+        this.#objectLabel = name;
+        document.getElementById("display-object-name").innerText = name;
+        document.getElementById("enter-scan-name").classList.add("d-none");
+        document.getElementById("scan-take-photos").classList.remove("d-none");
+      }
+    });
+
+    this.startTrackingBtn.addEventListener("click", () => {
+      this.analyzeTap();
+    });
+
+    this.detectionCanvas.addEventListener("click", () => this.analyzeTap());
+  }
+
+  loop() {
     //Object detection is not initiated through automated recurring search,
     //But through tapping the screen. Thus, it is not called during the loop iteration.
     //Object tracking step
@@ -49,7 +77,8 @@ export class ScanningLoop {
   }
 
   updateTracking() {
-    let detection = this.detector.getCurrentBoundingBox();
+    let detection = this.detector.getCurrentDetection();
+    detection.label = this.#objectLabel;
 
     if (detection != null && detection.box) {
       this.#isTracking = this.tracker.init(
@@ -77,5 +106,18 @@ export class ScanningLoop {
         this.tracker.drawDetection(detection);
       }
     }
+  }
+
+  updateCanvasDimensions() {
+    this.camera.updateVisibleRegion();
+    this.camera.setDimensionsAndPosition(
+      this.camera.visibleRegion.width,
+      this.camera.visibleRegion.height,
+    );
+    this.tracker.setDimensionsAndPosition(
+      window.innerWidth,
+      window.innerHeight,
+    );
+    this.detector.initiateCenterDot();
   }
 }

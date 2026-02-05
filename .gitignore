@@ -5,3 +5,4 @@ reading/*
 .github/copilot-instructions.md
 .DS_Store
 **/.DS_Store
+docs/bs_studio/*

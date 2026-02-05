@@ -1,5 +1,5 @@
 import { CameraHandler } from "./modules/camera.js";
-import { DetectionLoop } from "./detectionLoop.js";
+import { DetectionGenericLoop } from "./detectionGenericLoop.js";
 import { ScanningLoop } from "./scanningLoop.js";
 import { UI } from "./modules/ui.js";
 
@@ -13,7 +13,7 @@ export class AR {
       this.updateCanvasDimensions();
     });
 
-    this.detectionLoop = new DetectionLoop(this.camera);
+    this.detectionLoop = new DetectionGenericLoop(this.camera);
     this.scanningLoop = new ScanningLoop(this.camera);
 
     // Update visible region on window resize
@@ -26,7 +26,7 @@ export class AR {
     if (UI.isScanningMode) {
       this.scanningLoop.scanningLoopIteration();
     } else {
-      this.detectionLoop.detectionLoopIteration();
+      this.detectionLoop.loop();
     }
     requestAnimationFrame(() => this.loop());
   }

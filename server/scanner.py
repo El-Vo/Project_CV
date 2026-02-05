@@ -6,8 +6,8 @@ import json
 import faiss
 from PIL import Image
 from transformers import AutoImageProcessor, AutoModel
+from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
-from sam2 import load_model
 
 
 class ObjectScanner:
@@ -18,9 +18,11 @@ class ObjectScanner:
         self.db_folder = db_folder
 
         # 1. Initialize Models (SAM 2 + DINOv2)
-        sam2_checkpoint = "models/sam2/checkpoints/sam2_hiera_tiny.pt"
-        sam2_model = load_model(
-            variant="tiny", ckpt_path=sam2_checkpoint, device=self.device
+        sam2_checkpoint = "models/sam2_t.pt"
+        sam2_model = build_sam2(
+            "configs/sam2/sam2_hiera_t.yaml",
+            ckpt_path=sam2_checkpoint,
+            device=self.device,
         )
         self.predictor = SAM2ImagePredictor(sam2_model)
 

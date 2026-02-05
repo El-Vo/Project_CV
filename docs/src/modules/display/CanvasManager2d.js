@@ -4,8 +4,8 @@ export class CanvasManager2d {
     this.ctx = this.canvas.getContext("2d", {
       willReadFrequently: true,
     });
-    this.percent = 0.1;
-    this.minSize = 24;
+    this.percent = 0.02;
+    this.minSize = 1;
     this.maxSize = 120;
   }
 
@@ -36,15 +36,16 @@ export class CanvasManager2d {
   }
 
   drawCenteredBox() {
+    const cw = this.canvas.width || this.canvas.clientWidth || 0;
     const size = Math.max(
       this.minSize,
       Math.min(this.maxSize, Math.round(cw * this.percent)),
     );
-    [cx, cy] = this.getCenterCoordinatesOfCanvas();
+    let [cx, cy] = this.getCenterCoordinatesOfCanvas();
     const x1 = cx - Math.round(size / 2);
     const y1 = cy - Math.round(size / 2);
-    const x2 = x1 + this.size;
-    const y2 = y1 + this.size;
+    const x2 = x1 + size;
+    const y2 = y1 + size;
     this.drawRectangle([x1, y1, x2, y2]);
     return [x1, y1, x2, y2];
   }

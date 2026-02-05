@@ -178,7 +178,7 @@ export class FeatureTracker extends CanvasManager2d {
       frame.delete();
       nextPoints.delete();
 
-      detection = Detector.getDefaultBoundingBox();
+      let detection = Detector.getDefaultBoundingBox();
       detection.box = this.currentBox;
       detection.score = validCount / 50;
 

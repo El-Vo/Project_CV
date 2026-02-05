@@ -1,4 +1,4 @@
-import { saveToFaissAPI } from "./api";
+import { saveToFaissAPI } from "./api.js";
 
 export class PersonalObjectPicture {
   async saveToDatabase(detection, image_jpg_blob) {

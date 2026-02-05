@@ -2,13 +2,12 @@ import { CONFIG } from "./modules/config.js";
 import { DepthEstimator } from "./modules/depth.js";
 import { ParkingSensor } from "./modules/audio.js";
 import { UI } from "./modules/ui.js";
-import { RemoteGenericDetection } from "./modules/bounding_box_detectors/remoteGenericDetection.js";
+import { CameraHandler } from "./modules/camera.js";
 import { RemotePersonalizedDetection } from "./modules/bounding_box_detectors/remotePersonalizedDetection.js";
 import { FeatureTracker } from "./modules/display/tracking.js";
-import { TapDetection } from "./modules/bounding_box_detectors/tapDetection.js";
 import { DepthUIController } from "./modules/display/depthUI.js";
 
-export class DetectionLoop {
+export class DetectionPersonalizedLoop {
   #lastDetectionTimestamp = 0;
   #lastTrackingTimestamp = 0;
   #countOfSuccessfulTrackingiterations = 0;
@@ -20,25 +19,20 @@ export class DetectionLoop {
 
   depthCanvas = document.getElementById("depth-canvas");
   detectionCanvas = document.getElementById("detection-canvas");
+  webcam = document.getElementById("webcam");
+  captureCanvas = document.getElementById("capture-canvas");
 
-  constructor(camera) {
-    if (CONFIG.LOCAL_MODE) {
-      this.detector = new TapDetection(this.detectionCanvas);
-      UI.setLocalMode(true);
-    } else if (CONFIG.PERSONALIZED_MODE) {
-      this.detector = new RemotePersonalizedDetection();
-    } else {
-      this.detector = new RemoteGenericDetection();
-    }
+  constructor() {
+    this.camera = new CameraHandler(this.webcam, this.captureCanvas);
+    this.camera.start().then(() => {
+      this.updateCanvasDimensions();
+    });
 
-    this.camera = camera;
-
+    this.detector = new RemotePersonalizedDetection();
     this.tracker = new FeatureTracker(this.detectionCanvas);
-
     this.depth = new DepthEstimator(CONFIG.DEPTH_MODEL);
     this.depth.init();
     this.depthUI = new DepthUIController(this.depthCanvas);
-
     this.sensor = new ParkingSensor();
     this.sensor.init();
 
@@ -47,13 +41,11 @@ export class DetectionLoop {
     });
   }
 
-  detectionLoopIteration() {
+  loop() {
     // Object detection step
     if (
       !this.#isDetecting &&
       !this.#isTracking &&
-      !CONFIG.LOCAL_MODE &&
-      (UI.getTextPrompt() != "" || CONFIG.PERSONALIZED_MODE) &&
       performance.now() >
         this.#lastDetectionTimestamp + 1000 / CONFIG.DETECTION_FPS_TARGET
     ) {
@@ -81,15 +73,13 @@ export class DetectionLoop {
       this.#lastDepthEstimationTimestamp = performance.now();
     }
 
-    //Clear bounding boxes if no text input is given and stop audio
-    if (
-      !CONFIG.LOCAL_MODE &&
-      !CONFIG.PERSONALIZED_MODE &&
-      UI.getTextPrompt() == ""
-    ) {
+    /*     //Clear bounding boxes if no text input is given and stop audio
+    if (!this.#isTracking) {
       this.tracker.clearCanvas();
       this.sensor.stop();
-    }
+    } */
+
+    requestAnimationFrame(() => this.loop());
   }
 
   async updateObjectDetection() {
@@ -105,19 +95,9 @@ export class DetectionLoop {
   }
 
   updateTracking() {
-    let detection = this.detector.getCurrentBoundingBox();
+    let detection = this.detector.getCurrentDetection();
 
     if (detection != null && detection.box) {
-      // Since local mode gets bounding boxes based on the detection canvas
-      // and not from the picture itself, we must account for that
-      if (CONFIG.LOCAL_MODE) {
-        detection.box = this.camera.translateBoundingBoxToPictureScaling(
-          detection.box,
-        );
-        // Scale to resized coordinates for tracking
-        detection.box = this.camera.scaleBoundingBoxToResized(detection.box);
-      }
-
       this.#isTracking = this.tracker.init(
         this.camera.takePictureResized(false),
         detection.box,
@@ -151,8 +131,7 @@ export class DetectionLoop {
 
     if (
       this.#countOfSuccessfulTrackingiterations >
-        2 * CONFIG.TRACKER_FPS_TARGET &&
-      !CONFIG.LOCAL_MODE
+      2 * CONFIG.TRACKER_FPS_TARGET
     ) {
       this.#isTracking = false;
       this.#countOfSuccessfulTrackingiterations = 0;
@@ -191,6 +170,11 @@ export class DetectionLoop {
   }
 
   updateCanvasDimensions() {
+    this.camera.updateVisibleRegion();
+    this.camera.setDimensionsAndPosition(
+      this.camera.visibleRegion.width,
+      this.camera.visibleRegion.height,
+    );
     this.tracker.setDimensionsAndPosition(
       window.innerWidth,
       window.innerHeight,

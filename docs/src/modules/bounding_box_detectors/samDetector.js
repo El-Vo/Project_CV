@@ -20,6 +20,8 @@ export class SAMDetection extends Detector {
     const response = await getBoundingBoxFromCoordAPI(x, y, image_jpg_blob);
     if (!response.ok) return null;
     const data = await response.json();
-    this.objectDetected = data.detection;
+    let detection = Detector.getDefaultBoundingBox();
+    detection.box = data.bounding_box;
+    this.objectDetected = detection;
   }
 }
