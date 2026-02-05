@@ -78,7 +78,6 @@ export class ScanningLoop {
 
   updateTracking() {
     let detection = this.detector.getCurrentDetection();
-    detection.label = this.#objectLabel;
 
     if (detection != null && detection.box) {
       this.#isTracking = this.tracker.init(
@@ -97,12 +96,10 @@ export class ScanningLoop {
         // Scale back up from resized coordinates to full picture coordinates
         detection.box = this.camera.scaleBoundingBoxFromResized(detection.box);
 
-        this.updateObjectCenter(detection.box);
-
         detection.box = this.camera.translateBoundingBoxToWindowScaling(
           detection.box,
         );
-
+        detection.label = this.#objectLabel;
         this.tracker.drawDetection(detection);
       }
     }

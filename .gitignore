@@ -6,3 +6,4 @@ reading/*
 .DS_Store
 **/.DS_Store
 docs/bs_studio/*
+faiss_db/*
