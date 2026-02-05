@@ -88,9 +88,15 @@
           <h4 class="card-title">
             Scanning: <span id="display-object-name">&lt;object&gt;</span>
           </h4>
-          <h6 class="text-muted card-subtitle mb-2">
+          <h6 id="scan-instructions" class="text-muted card-subtitle mb-2">
             Point the blue square at the object and press the button &quot;Start
             Object Tracking&quot;.
+          </h6>
+          <h6
+            id="photo-count-container"
+            class="text-muted card-subtitle mb-2 d-none"
+          >
+            Photos taken: <span id="photo-count">0</span>
           </h6>
           <button
             id="start-tracking-button"

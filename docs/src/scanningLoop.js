@@ -8,6 +8,7 @@ export class ScanningLoop extends DetectionLoop {
   submitBtn = document.getElementById("submit-name-button");
   nameInput = document.getElementById("object-name-input");
   startTrackingBtn = document.getElementById("start-tracking-button");
+  _photoCount = 0;
 
   constructor() {
     super();
@@ -50,6 +51,27 @@ export class ScanningLoop extends DetectionLoop {
     }
   }
 
+  updateTracking() {
+    const wasTracking = this._isTracking;
+    super.updateTracking();
+    if (!wasTracking && this._isTracking) {
+      this.updateUIForTracking();
+    }
+  }
+
+  updateUIForTracking() {
+    this.startTrackingBtn.innerText = "Take Photo";
+    const instructions = document.getElementById("scan-instructions");
+    if (instructions) {
+      instructions.innerText =
+        "Move around the object and take photos from different perspectives.";
+    }
+    const countContainer = document.getElementById("photo-count-container");
+    if (countContainer) {
+      countContainer.classList.remove("d-none");
+    }
+  }
+
   async analyzeTap() {
     const imgBlob = await this.camera.takePictureResized();
     if (!imgBlob) {
@@ -67,6 +89,12 @@ export class ScanningLoop extends DetectionLoop {
       detection.box = this.tracker.currentBox;
       detection.label = this._objectLabel;
       this.savePersonalizedPicture.saveToDatabase(detection, imgBlob);
+
+      this._photoCount++;
+      const countDisplay = document.getElementById("photo-count");
+      if (countDisplay) {
+        countDisplay.innerText = this._photoCount;
+      }
       //Vibrate
     }
   }
