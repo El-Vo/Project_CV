@@ -2,11 +2,13 @@ import { CONFIG } from "./modules/config.js";
 import { UI } from "./modules/ui.js";
 import { RemoteGenericDetection } from "./modules/bounding_box_detectors/remoteGenericDetection.js";
 import { DetectionLoop } from "./detectionLoop.js";
+import { TextToSpeech } from "./modules/tts.js";
 
 export class DetectionGenericLoop extends DetectionLoop {
   constructor() {
     super();
     this.detector = new RemoteGenericDetection();
+    TextToSpeech.speak("Starting object search.");
   }
 
   loop() {

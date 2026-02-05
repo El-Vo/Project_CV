@@ -3,6 +3,7 @@ import { Detector } from "./modules/bounding_box_detectors/detector.js";
 import { CONFIG } from "./modules/config.js";
 import { PersonalObjectPicture } from "./modules/personalObjectPicture.js";
 import { DetectionLoop } from "./detectionLoop.js";
+import { TextToSpeech } from "./modules/tts.js";
 
 export class ScanningLoop extends DetectionLoop {
   submitBtn = document.getElementById("submit-name-button");
@@ -18,6 +19,8 @@ export class ScanningLoop extends DetectionLoop {
     this._maxTrackingIterations = Infinity;
 
     this.initializeUI();
+
+    TextToSpeech.speak("Starting scan mode for personal objects");
   }
 
   initializeUI() {

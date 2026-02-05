@@ -60,6 +60,8 @@ export class DetectionLoop {
       console.error("Detection error:", err);
     } finally {
       this._isDetecting = false;
+      const prompt = UI.getTextPrompt();
+      TextToSpeech.speak(`Found ${prompt}`);
     }
   }
 

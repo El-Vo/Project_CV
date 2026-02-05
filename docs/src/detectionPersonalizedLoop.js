@@ -1,11 +1,13 @@
 import { CONFIG } from "./modules/config.js";
 import { RemotePersonalizedDetection } from "./modules/bounding_box_detectors/remotePersonalizedDetection.js";
 import { DetectionLoop } from "./detectionLoop.js";
+import { TextToSpeech } from "./modules/tts.js";
 
 export class DetectionPersonalizedLoop extends DetectionLoop {
   constructor() {
     super();
     this.detector = new RemotePersonalizedDetection();
+    TextToSpeech.speak("Starting search for personal objects.");
   }
 
   loop() {
