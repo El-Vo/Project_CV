@@ -10,6 +10,7 @@ export class DepthEstimator {
   constructor(modelId) {
     this.modelId = modelId;
     this.estimator = null;
+    //This canvas is not done by the CanvasManager2d because it is an offscreen-canvas
     this.canvas = null;
     this.ctx = null;
     this.rawCameraToDepthXFactor = 0;

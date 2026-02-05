@@ -2,6 +2,7 @@ import { CONFIG } from "./config.js";
 
 export class UI {
   static promptInput = document.getElementById("promptInput");
+  static modeToggleBtn = document.getElementById("modeToggleBtn");
   static toggleDetBtn = document.getElementById("toggleDetBtn");
   static distanceEl = document.getElementById("distance");
   static controlsBottom = document.getElementById("controls-bottom");

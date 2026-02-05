@@ -1,4 +1,4 @@
-import { CanvasManager2d } from "./CanvasManager2d.js";
+import { CanvasManager2d } from "./display/CanvasManager2d.js";
 import { CONFIG } from "./config.js";
 
 export class CameraHandler extends CanvasManager2d {
