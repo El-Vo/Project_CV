@@ -1,6 +1,4 @@
 export const CONFIG = {
-  LOCAL_MODE: false,
-  PERSONALIZED_MODE: true,
   API_URL: "http://localhost:8000",
   GENERIC_DETECTION_PATH: "/detect",
   PERSONALIZED_DETECTION_PATH: "/detect_personalized",
@@ -18,4 +16,5 @@ export const CONFIG = {
   TRACKER_SEARCH_RANGE: 60,
   TRACKER_SENSITIVITY: 200,
   TRACKER_FPS_TARGET: 60,
+  ENABLE_TTS: true,
 };
