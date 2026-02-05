@@ -62,6 +62,11 @@ export class ScanningLoop {
 
   async analyzeTap() {
     const imgBlob = await this.camera.takePictureResized();
+    if (!imgBlob) {
+      console.warn("Could not take picture: Blob is null");
+      return;
+    }
+
     if (!this.#isTracking) {
       console.log("Tap detected, initialising bounding box");
       this.detector.detectObject(imgBlob);

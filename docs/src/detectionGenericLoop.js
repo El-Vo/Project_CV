@@ -87,6 +87,10 @@ export class DetectionGenericLoop {
     this.#isDetecting = true;
     try {
       const imgBlob = await this.camera.takePictureResized();
+      if (!imgBlob) {
+        console.warn("Could not take picture: Blob is null");
+        return;
+      }
       await this.detector.detectObject(imgBlob);
     } catch (err) {
       console.error("Detection error:", err);

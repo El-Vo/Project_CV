@@ -134,8 +134,12 @@ class ObjectRecognizer:
             return None
 
         # Return the match
-        obj_name = self.id_to_name[idx]
-        return {"label": obj_name, "score": similarity, "box": (x1, y1, w, h)}
+        obj_name = str(self.id_to_name[idx])
+        return {
+            "label": obj_name,
+            "score": float(similarity),
+            "box": [int(x1), int(y1), int(w), int(h)],
+        }
 
     # Run FastSAM + FAISS identification on current frame, this cycle needs to be called periodically
     def run_identification_cycle(self, frame):
