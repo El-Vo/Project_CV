@@ -62,6 +62,13 @@ async def get_bounding_box(
     return {"bounding_box": bounding_box}
 
 
+@app.get("/get_personal_object_labels")
+async def get_personal_object_labels():
+    summary = object_scanner.get_object_summary()
+    labels = list(summary.keys())
+    return {"labels": labels, "summary": summary}
+
+
 @app.post("/save_to_faiss")
 async def save_to_faiss(
     bbox: str = Form(...), label: str = Form(...), file: UploadFile = File(...)

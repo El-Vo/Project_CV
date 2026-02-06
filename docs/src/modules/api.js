@@ -46,3 +46,17 @@ export const saveToFaissAPI = (bbox, label, image_blob) => {
     body: formData,
   });
 };
+
+export const getPersonalObjectLabels = async () => {
+  try {
+    const response = await fetch(
+      `${CONFIG.API_URL}/get_personal_object_labels`,
+    );
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.labels || [];
+  } catch (error) {
+    console.error("Error fetching labels:", error);
+    return [];
+  }
+};

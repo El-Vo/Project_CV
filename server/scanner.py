@@ -52,19 +52,22 @@ class ObjectScanner:
             print(f"✓ Loaded existing database from {self.db_folder}")
             print(f"  - Total feature vectors: {self.index.ntotal}")
 
-            # Count unique objects and their perspectives
-            unique_objects = set(self.id_to_name)
-            print(f"  - Unique objects: {len(unique_objects)}")
+            summary = self.get_object_summary()
+            print(f"  - Unique objects: {len(summary)}")
 
             # Show details for each object
-            for obj in unique_objects:
-                count = self.id_to_name.count(obj)
+            for obj, count in summary.items():
                 print(f"    • '{obj}': {count} perspective{'s' if count != 1 else ''}")
         else:
             # Create new database
             self.index = faiss.IndexFlatL2(self.dimension)
             self.id_to_name = []
             print(f"✓ Created new empty database (will save to {self.db_folder})")
+
+    def get_object_summary(self):
+        """Returns a dictionary of unique objects and their perspective counts."""
+        unique_objects = sorted(list(set(self.id_to_name)))
+        return {obj: self.id_to_name.count(obj) for obj in unique_objects}
 
     # Function to save FAISS index and mapping in json
     def save_to_database(self):
@@ -74,11 +77,10 @@ class ObjectScanner:
             json.dump(self.id_to_name, f, indent=4)
 
         print(f"✓ Database saved to {self.db_folder}")
-        unique_objects = set(self.id_to_name)
+        summary = self.get_object_summary()
         print(f"  - Total feature vectors: {self.index.ntotal}")
-        print(f"  - Unique objects: {len(unique_objects)}")
-        for obj in unique_objects:
-            count = self.id_to_name.count(obj)
+        print(f"  - Unique objects: {len(summary)}")
+        for obj, count in summary.items():
             print(f"    • '{obj}': {count} perspective{'s' if count != 1 else ''}")
 
     # Function to process frame, extract object and store features and object name in FAISS
