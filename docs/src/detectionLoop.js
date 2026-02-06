@@ -13,7 +13,7 @@ export class DetectionLoop {
   _isDetecting = false;
   _isTracking = false;
   _isDepthEstimating = false;
-  _CurrentObjectCenter = { x: 0, y: 0 };
+  _CurrentBoundingBox = null;
   _objectLabel = null;
 
   depthCanvas = document.getElementById("depth-canvas");
@@ -88,7 +88,7 @@ export class DetectionLoop {
         // Scale back up from resized coordinates to full picture coordinates
         detection.box = this.camera.scaleBoundingBoxFromResized(detection.box);
 
-        this.updateObjectCenter(detection.box);
+        this._CurrentBoundingBox = detection.box;
 
         detection.box = this.camera.translateBoundingBoxToWindowScaling(
           detection.box,
@@ -107,6 +107,7 @@ export class DetectionLoop {
     if (
       this._countOfSuccessfulTrackingiterations > this._maxTrackingIterations
     ) {
+      this.updateObjectDetection();
       this._isTracking = false;
       this._countOfSuccessfulTrackingiterations = 0;
       if (this.sensor) this.sensor.stop();
@@ -124,25 +125,16 @@ export class DetectionLoop {
       this.depthUI.setDepthPrediction(depthPrediction);
       this.depthUI.updateDepthCanvas();
       //Scale objectPosition based on raw camera input to depth map resoulution
-      const depthObjectCenter = {
-        x: this.depth.scaleRawCameraToDepthX(this._CurrentObjectCenter.x),
-        y: this.depth.scaleRawCameraToDepthY(this._CurrentObjectCenter.y),
-      };
-      const obj_depth = this.depthUI.updateDepthOfObject(depthObjectCenter);
+      const obj_depth = this.depthUI.updateDepthOfObject(
+        this._CurrentBoundingBox,
+        this.depth,
+      );
       if (this.sensor) this.sensor.update(obj_depth);
     } catch (err) {
       console.error("Depth estimation error:", err);
     } finally {
       this._isDepthEstimating = false;
     }
-  }
-
-  updateObjectCenter(box) {
-    let [x1, y1, x2, y2] = box;
-    this._CurrentObjectCenter = {
-      x: (x2 - x1) / 2,
-      y: (y2 - y1) / 2,
-    };
   }
 
   updateCanvasDimensions() {

@@ -28,27 +28,49 @@ export class DepthUIController extends CanvasManager2d {
     this.ctx.drawImage(visualCanvas, 0, 0);
   }
 
-  updateDepthOfObject(objectPosition) {
-    if (this.depthPrediction == null || objectPosition == null) {
+  updateDepthOfObject(boundingBox, depthEstimator) {
+    if (
+      this.depthPrediction == null ||
+      boundingBox == null ||
+      depthEstimator == null
+    ) {
       return;
     }
 
     // Extract depth data and dimensions
     const { width, height, data } = this.depthPrediction;
+    const [x1, y1, x2, y2] = boundingBox;
+    const numPoints = 10;
+    let totalDepth = 0;
+    let validPoints = 0;
 
-    // Calculate index in depth map
-    const tx = Math.floor(objectPosition.x);
-    const ty = Math.floor(objectPosition.y);
-    const idx = Math.max(0, Math.min(width * height - 1, ty * width + tx));
+    for (let i = 0; i < numPoints; i++) {
+      // Random point within bounding box
+      const randX = x1 + Math.random() * (x2 - x1);
+      const randY = y1 + Math.random() * (y2 - y1);
 
-    // Get depth value
-    const val = data[idx];
+      // Scale to depth map coordinates
+      const tx = Math.floor(depthEstimator.scaleRawCameraToDepthX(randX));
+      const ty = Math.floor(depthEstimator.scaleRawCameraToDepthY(randY));
+
+      // Check bounds
+      if (tx >= 0 && tx < width && ty >= 0 && ty < height) {
+        const idx = ty * width + tx;
+        const val = data[idx];
+        if (val) {
+          totalDepth += val;
+          validPoints++;
+        }
+      }
+    }
+
+    const avgDepth = validPoints > 0 ? totalDepth / validPoints : 0;
 
     // Update UI
     if (UI.distanceEl) {
-      UI.distanceEl.innerText = val ? val.toFixed(3) : "--";
+      UI.distanceEl.innerText = avgDepth ? avgDepth.toFixed(3) : "--";
     }
 
-    return val;
+    return avgDepth;
   }
 }
