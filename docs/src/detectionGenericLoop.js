@@ -15,7 +15,6 @@ export class DetectionGenericLoop extends DetectionLoop {
     // Object detection step
     if (
       !this._isDetecting &&
-      !this._isTracking &&
       UI.getTextPrompt() != "" &&
       performance.now() >
         this._lastDetectionTimestamp + 1000 / CONFIG.DETECTION_FPS_TARGET
@@ -43,6 +42,9 @@ export class DetectionGenericLoop extends DetectionLoop {
       this.updateDepth();
       this._lastDepthEstimationTimestamp = performance.now();
     }
+
+    //Sensor update step
+    this.updateSensor();
 
     //Clear bounding boxes if no text input is given and stop audio
     if (UI.getTextPrompt() == "") {

@@ -42,6 +42,9 @@ export class DetectionPersonalizedLoop extends DetectionLoop {
       this._lastDepthEstimationTimestamp = performance.now();
     }
 
+    //Sensor update step
+    this.updateSensor();
+
     requestAnimationFrame(() => this.loop());
   }
 }

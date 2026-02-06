@@ -3,9 +3,13 @@ import { CONFIG } from "./config.js";
 export class ParkingSensor {
   constructor() {
     this.audioCtx = null;
-    this.beepInterval = null;
+    this.beepTimer = null;
     this.active = false;
-    this.currentDistance = 0;
+    this.currentStage = 2; // Always start at stage 2
+
+    // For Stage 5 (Continuous)
+    this.continuousOsc = null;
+    this.continuousGain = null;
   }
 
   init() {
@@ -20,38 +24,88 @@ export class ParkingSensor {
   start() {
     if (this.active) return;
     this.active = true;
+    this.currentStage = 2; // Reset to stage 2 on start
     this.loop();
   }
 
   stop() {
     this.active = false;
-    if (this.beepInterval) {
-      clearTimeout(this.beepInterval);
-      this.beepInterval = null;
+    this.stopContinuous();
+    if (this.beepTimer) {
+      clearTimeout(this.beepTimer);
+      this.beepTimer = null;
     }
   }
 
-  update(distance) {
-    this.currentDistance = distance;
+  increaseStage() {
+    if (this.currentStage < 5) {
+      this.currentStage++;
+    }
+  }
+
+  decreaseStage() {
+    if (this.currentStage > 1) {
+      this.currentStage--;
+    }
   }
 
   loop() {
     if (!this.active) return;
 
-    if (this.currentDistance > 0) {
+    if (this.beepTimer) clearTimeout(this.beepTimer);
+
+    if (this.currentStage === 5) {
+      this.startContinuous();
+      // Check again shortly to adjust if stage changes
+      this.beepTimer = setTimeout(() => this.loop(), 100);
+    } else {
+      this.stopContinuous();
+
       this.playBeep();
+
+      // Delays for Stages 1-4
+      let delay = 1200; // Stage 1
+      if (this.currentStage === 2) delay = 800;
+      else if (this.currentStage === 3) delay = 400;
+      else if (this.currentStage === 4) delay = 150;
+
+      this.beepTimer = setTimeout(() => this.loop(), delay);
     }
+  }
 
-    let delay = CONFIG.AUDIO_MAX_DELAY;
-    // Scale distance (assuming 0-255 range) to delay range
-    // 255 (Near) -> Min Delay (Fast)
-    // 0 (Far) -> Max Delay (Slow)
-    const normalized = Math.max(0, Math.min(255, this.currentDistance)) / 255;
-    delay =
-      CONFIG.AUDIO_MAX_DELAY -
-      normalized * (CONFIG.AUDIO_MAX_DELAY - CONFIG.AUDIO_MIN_DELAY);
+  startContinuous() {
+    if (this.continuousOsc) return;
+    if (!this.audioCtx) return;
 
-    this.beepInterval = setTimeout(() => this.loop(), delay);
+    this.continuousOsc = this.audioCtx.createOscillator();
+    this.continuousGain = this.audioCtx.createGain();
+
+    this.continuousOsc.type = "sine";
+    this.continuousOsc.frequency.setValueAtTime(
+      CONFIG.AUDIO_BEEP_FREQ,
+      this.audioCtx.currentTime,
+    );
+
+    this.continuousGain.gain.setValueAtTime(0.1, this.audioCtx.currentTime);
+
+    this.continuousOsc.connect(this.continuousGain);
+    this.continuousGain.connect(this.audioCtx.destination);
+    this.continuousOsc.start();
+  }
+
+  stopContinuous() {
+    if (this.continuousOsc) {
+      try {
+        // Ramp down quickly to avoid clicking
+        const now = this.audioCtx.currentTime;
+        this.continuousGain.gain.setTargetAtTime(0, now, 0.05);
+        this.continuousOsc.stop(now + 0.1);
+      } catch (e) {
+        // Ignore errors if already stopped
+      }
+      this.continuousOsc = null;
+      this.continuousGain = null;
+    }
   }
 
   playBeep() {
