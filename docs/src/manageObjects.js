@@ -29,7 +29,8 @@ export class ManageObjects {
     labels.forEach((label) => {
       const btn = document.createElement("button");
       btn.className =
-        "btn btn-secondary btn-lg d-flex align-items-center justify-content-center flex-fill";
+        "btn btn-secondary btn-lg d-flex align-items-center justify-content-center flex-fill w-100";
+      btn.style.minHeight = "0"; // Allow buttons to shrink if many exist
       btn.innerHTML = `<span>${label}</span>`;
 
       let deleteConfirmMode = false;
