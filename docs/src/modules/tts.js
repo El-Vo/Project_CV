@@ -37,7 +37,7 @@ export class TextToSpeech {
   }
 
   static async speak(text, lang = "en-US") {
-    if (!window.speechSynthesis || CONFIG.ENABLE_TTS) {
+    if (!window.speechSynthesis || !CONFIG.ENABLE_TTS) {
       console.warn(
         "Speech Synthesis not supported in this browser or turned off by configuration.",
       );
