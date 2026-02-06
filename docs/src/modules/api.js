@@ -60,3 +60,19 @@ export const getPersonalObjectLabels = async () => {
     return [];
   }
 };
+
+export const deletePersonalObjectAPI = async (label) => {
+  try {
+    const formData = new FormData();
+    formData.append("label", label);
+
+    const response = await fetch(`${CONFIG.API_URL}/delete_personal_object`, {
+      method: "POST",
+      body: formData,
+    });
+    return await response.json();
+  } catch (error) {
+    console.error("Error deleting label:", error);
+    return { success: false };
+  }
+};

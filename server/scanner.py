@@ -83,6 +83,31 @@ class ObjectScanner:
         for obj, count in summary.items():
             print(f"    • '{obj}': {count} perspective{'s' if count != 1 else ''}")
 
+    def delete_object(self, label):
+        """Removes all perspectives of an object from the database."""
+        indices_to_keep = [i for i, name in enumerate(self.id_to_name) if name != label]
+
+        if len(indices_to_keep) == len(self.id_to_name):
+            print(f"⚠ Object '{label}' not found in database.")
+            return False
+
+        # Rebuild index to ensure consistency
+        new_index = faiss.IndexFlatL2(self.dimension)
+        if indices_to_keep:
+            # Extract all vectors we want to keep
+            vectors = []
+            for i in indices_to_keep:
+                vectors.append(self.index.reconstruct(i))
+            vectors = np.array(vectors).astype("float32")
+            new_index.add(vectors)
+
+        self.index = new_index
+        self.id_to_name = [self.id_to_name[i] for i in indices_to_keep]
+
+        print(f"✓ Deleted all entries for object '{label}'")
+        self.save_to_database()
+        return True
+
     # Function to process frame, extract object and store features and object name in FAISS
     def process_and_store(self, frame, bbox, label):
         # Get Mask

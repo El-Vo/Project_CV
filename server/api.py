@@ -95,5 +95,17 @@ async def save_to_faiss(
     success = object_scanner.process_and_store(image_bgr, bbox_list, label)
     if success:
         object_scanner.save_to_database()
+        # Refresh the personalized detector's database
+        personalized_detector._load_database()
+
+    return {"success": success}
+
+
+@app.post("/delete_personal_object")
+async def delete_personal_object(label: str = Form(...)):
+    success = object_scanner.delete_object(label)
+    if success:
+        # Refresh the personalized detector's database to reflect changes
+        personalized_detector._load_database()
 
     return {"success": success}
