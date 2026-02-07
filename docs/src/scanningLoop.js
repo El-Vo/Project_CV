@@ -69,8 +69,26 @@ export class ScanningLoop extends DetectionLoop {
   updateTracking() {
     const wasTracking = this._isTracking;
     super.updateTracking();
+    this._lastVotedDetection = this.detector.getCurrentDetection();
+    if (wasTracking && !this._isTracking) {
+      this.updateUIForScanning();
+      this.detector.initiateCenterDot();
+    }
     if (!wasTracking && this._isTracking) {
       this.updateUIForTracking();
+    }
+  }
+
+  updateUIForScanning() {
+    this.startTrackingBtn.innerText = "Start Object Tracking";
+    const instructions = document.getElementById("scan-instructions");
+    if (instructions) {
+      instructions.innerText =
+        "Point the blue square at the object and press the button.";
+    }
+    const countContainer = document.getElementById("photo-count-container");
+    if (countContainer) {
+      countContainer.classList.add("d-none");
     }
   }
 

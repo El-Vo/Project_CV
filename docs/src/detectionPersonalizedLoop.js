@@ -31,6 +31,10 @@ export class DetectionPersonalizedLoop extends DetectionLoop {
       this._lastTrackingTimestamp = performance.now();
     }
 
+    if (!this._isTracking) {
+      this.depthUI.clearCanvas();
+    }
+
     //Depth estimation step
     if (
       this._isTracking &&

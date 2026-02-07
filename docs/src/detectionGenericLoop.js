@@ -43,6 +43,10 @@ export class DetectionGenericLoop extends DetectionLoop {
       this._lastDepthEstimationTimestamp = performance.now();
     }
 
+    if (!this._isTracking) {
+      this.depthUI.clearCanvas();
+    }
+
     //Sensor update step
     this.updateSensor();
 
@@ -50,6 +54,7 @@ export class DetectionGenericLoop extends DetectionLoop {
     if (UI.getTextPrompt() == "") {
       this.tracker.clearCanvas();
       if (this.sensor) this.sensor.stop();
+      this.depthUI.clearCanvas();
     }
 
     requestAnimationFrame(() => this.loop());

@@ -59,6 +59,11 @@ async def get_bounding_box(
     image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
 
     bounding_box = object_scanner.get_bounding_box_from_sam(image_bgr, x, y)
+    if bounding_box:
+        # Convert from [x, y, w, h] to [x1, y1, x2, y2]
+        x1, y1, w, h = bounding_box
+        bounding_box = [x1, y1, x1 + w, y1 + h]
+
     return {"bounding_box": bounding_box}
 
 

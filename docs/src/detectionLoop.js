@@ -85,6 +85,9 @@ export class DetectionLoop {
         this._isTracking = false;
         this._countOfSuccessfulTrackingiterations = 0;
         this.tracker.clearCanvas();
+        if (this.depthUI) {
+          this.depthUI.clearCanvas();
+        }
       } else {
         // Scale back up from resized coordinates to full picture coordinates
         detection.box = this.camera.scaleBoundingBoxFromResized(detection.box);
