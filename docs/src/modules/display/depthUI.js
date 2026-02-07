@@ -5,6 +5,7 @@ export class DepthUIController extends CanvasManager2d {
   constructor(canvas) {
     super(canvas);
     this.depthPrediction = null;
+    this.depthHistory = [];
   }
 
   setDepthPrediction(depthPrediction) {
@@ -66,11 +67,32 @@ export class DepthUIController extends CanvasManager2d {
 
     const avgDepth = validPoints > 0 ? totalDepth / validPoints : 0;
 
-    // Update UI
-    if (UI.distanceEl) {
-      UI.distanceEl.innerText = avgDepth ? avgDepth.toFixed(3) : "--";
+    // Temporal average
+    if (avgDepth > 0) {
+      this.depthHistory.push(avgDepth);
+      if (this.depthHistory.length > 5) {
+        this.depthHistory.shift();
+      }
     }
 
-    return avgDepth;
+    const temporalAvgDepth =
+      this.depthHistory.length > 0
+        ? this.depthHistory.reduce((a, b) => a + b, 0) /
+          this.depthHistory.length
+        : 0;
+
+    // Normalize from 0-255 to 0-100
+    const normalizedDepth = (temporalAvgDepth / 255) * 100;
+
+    // Round to nearest 10
+    const roundedDepth = Math.round(normalizedDepth / 10) * 10;
+
+    // Update UI
+    if (UI.distanceEl) {
+      UI.distanceEl.innerText =
+        roundedDepth !== null ? roundedDepth.toFixed(0) : "--";
+    }
+
+    return roundedDepth;
   }
 }
