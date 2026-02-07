@@ -99,7 +99,7 @@ export class DetectionLoop {
           detection.label = this._objectLabel;
         }
 
-        this.tracker.drawDetection(detection);
+        this.tracker.drawRectangle(detection.box);
 
         this._countOfSuccessfulTrackingiterations++;
       }
