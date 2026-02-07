@@ -7,7 +7,32 @@ export class DetectionPersonalizedLoop extends DetectionLoop {
   constructor() {
     super();
     this.detector = new RemotePersonalizedDetection();
-    TextToSpeech.speak("Starting search for personal objects.");
+
+    this._targetLabel = localStorage.getItem("selectedTargetLabel");
+
+    if (this._targetLabel) {
+      TextToSpeech.speak(`Starting search for ${this._targetLabel}.`);
+    } else {
+      TextToSpeech.speak(
+        "No label identified, please select a valid label from the menu before.",
+      );
+    }
+  }
+
+  async updateObjectDetection() {
+    this._isDetecting = true;
+    try {
+      const imgBlob = await this.camera.takePictureResized();
+      if (!imgBlob) {
+        console.warn("Could not take picture: Blob is null");
+        return;
+      }
+      await this.detector.detectObject(imgBlob, this._targetLabel);
+    } catch (err) {
+      console.error("Detection error:", err);
+    } finally {
+      this._isDetecting = false;
+    }
   }
 
   loop() {

@@ -37,7 +37,9 @@ async def detect_generic_object(prompt: str = Form(...), file: UploadFile = File
 
 
 @app.post("/detect_personalized")
-async def detect_personalized_object(file: UploadFile = File(...)):
+async def detect_personalized_object(
+    file: UploadFile = File(...), label: str = Form(...)
+):
     contents = await file.read()
     image_pil = Image.open(io.BytesIO(contents))
 
@@ -45,7 +47,7 @@ async def detect_personalized_object(file: UploadFile = File(...)):
     image_np = np.array(image_pil)
     image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
 
-    detection = personalized_detector.run_identification_cycle(image_bgr)
+    detection = personalized_detector.run_identification_cycle(image_bgr, label)
     return {"detection": detection}
 
 

@@ -11,9 +11,10 @@ export const detectGenericObjectAPI = (prompt, image_blob) => {
   });
 };
 
-export const detectPersonalizedObjectAPI = (image_blob) => {
+export const detectPersonalizedObjectAPI = (image_blob, label) => {
   const formData = new FormData();
   formData.append("file", image_blob, "frame.jpg");
+  formData.append("label", label);
 
   return fetch(CONFIG.API_URL + CONFIG.PERSONALIZED_DETECTION_PATH, {
     method: "POST",
