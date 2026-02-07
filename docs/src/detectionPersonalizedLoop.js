@@ -39,7 +39,6 @@ export class DetectionPersonalizedLoop extends DetectionLoop {
     // Object detection step
     if (
       !this._isDetecting &&
-      !this._isTracking &&
       performance.now() >
         this._lastDetectionTimestamp + 1000 / CONFIG.DETECTION_FPS_TARGET
     ) {
