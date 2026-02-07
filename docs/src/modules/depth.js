@@ -73,7 +73,7 @@ export class DepthEstimator {
     if (this.estimator) {
       console.log(`Status: Depth Estimator Ready (${usedBackend}).`);
 
-      UI.usedBackend.innerText = usedBackend;
+      // UI.usedBackend.innerText = usedBackend;
     }
   }
 
