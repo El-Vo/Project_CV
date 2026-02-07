@@ -37,6 +37,10 @@ export class PerformanceMetrics {
 
   objectDetected() {
     if (this.sessionState.isSearching) {
+      // Reset metrics only when a new object is actually found
+      this.metrics.guidanceTime = 0;
+      this.metrics.totalTime = 0;
+
       const now = performance.now();
       // "End: Bounding Box drawn" -> Search Time end.
       const searchDuration = (now - this.sessionState.searchStartTime) / 1000;
