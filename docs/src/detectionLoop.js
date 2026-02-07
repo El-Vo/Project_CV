@@ -175,6 +175,23 @@ export class DetectionLoop {
     const currentArea = w * h;
     const currentDepth = this._currentAvgDepth; // Uses the latest available depth
 
+    // Calculate total possible area based on resized detection image size
+    const { width: vrW, height: vrH } = this.camera.visibleRegion;
+    const isPortrait = vrW < vrH;
+    const shortSide = CONFIG.DETECTION_SHORT_SIDE_PX;
+    const targetWidth = isPortrait ? shortSide : (vrW / vrH) * shortSide;
+    const targetHeight = isPortrait ? (vrH / vrW) * shortSide : shortSide;
+    const totalArea = targetWidth * targetHeight;
+
+    // Check for "extremely close" condition: distance > 60 and area > 50% of viewport
+    if (currentDepth > 60 && currentArea > totalArea / 2) {
+      this.sensor.currentStage = 5;
+      console.log("Maximum stage reached: Object very close and large");
+      this._lastDetectionArea = currentArea;
+      this._lastDetectionDepth = currentDepth;
+      return;
+    }
+
     // First run initialization
     if (this._lastDetectionArea === 0) {
       this._lastDetectionArea = currentArea;
@@ -183,30 +200,20 @@ export class DetectionLoop {
     }
 
     // Logic for Increasing Stage (Closer)
-    // Area increased by >10% AND Depth value increased by >25
     if (
-      currentArea >= this._lastDetectionArea * 1.0 &&
-      currentDepth >= this._lastDetectionDepth + 15
+      currentArea >= this._lastDetectionArea * 1.1 &&
+      currentDepth >= this._lastDetectionDepth + 10
     ) {
       this.sensor.increaseStage();
       console.log("increasing stage of parking sensor");
     }
     // Logic for Decreasing Stage (Farther)
-    // Area decreased by >10% (current <= last * 0.9) AND Depth value decreased by >25
     else if (
-      currentArea <= this._lastDetectionArea * 1.0 &&
-      currentDepth <= this._lastDetectionDepth - 15
+      currentArea <= this._lastDetectionArea * 0.9 &&
+      currentDepth <= this._lastDetectionDepth - 10
     ) {
       this.sensor.decreaseStage();
       console.log("decreasing stage of parking sensor");
-    } else {
-      const dArea = currentArea - this._lastDetectionArea;
-      const dDepth = currentDepth - this._lastDetectionDepth;
-      const reason =
-        dArea >= 0
-          ? `Area grew (d=${dArea.toFixed(0)}) but Depth (d=${dDepth.toFixed(2)}) < 15`
-          : `Area shrank (d=${dArea.toFixed(0)}) but Depth (d=${dDepth.toFixed(2)}) > -15`;
-      console.log(`Vote lost: ${reason}`);
     }
 
     // Update references
