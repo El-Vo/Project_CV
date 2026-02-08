@@ -146,13 +146,22 @@ class ObjectScanner:
         self.id_to_name.append(label)
         return True
 
-    def get_bounding_box_from_sam(self, frame, center_x, center_y):
+    def get_bounding_box_from_sam(
+        self,
+        frame,
+        center_x,
+        center_y,
+        save_result=True,
+        output_path="segmentation_result.png",
+    ):
         """Use SAM to segment object at center point and derive bounding box.
 
         Args:
             frame: Input video frame (BGR)
             center_x: X coordinate of center point
             center_y: Y coordinate of center point
+            save_result: Whether to save visualization (default: False)
+            output_path: Path to save the result image (default: "segmentation_result.png")
 
         Returns:
             Tuple (x, y, w, h) or None if segmentation fails
@@ -171,7 +180,30 @@ class ObjectScanner:
             x_min, x_max = x_idx.min(), x_idx.max()
             y_min, y_max = y_idx.min(), y_idx.max()
             bbox = [int(x_min), int(y_min), int(x_max - x_min), int(y_max - y_min)]
+
+            # Save visualization if requested
+            if save_result:
+                display_frame = frame.copy()
+
+                # Overlay the mask with semi-transparent green
+                overlay = display_frame.copy()
+                overlay[mask_bool] = [0, 255, 0]  # Green color (BGR)
+                display_frame = cv2.addWeighted(display_frame, 0.7, overlay, 0.3, 0)
+
+                # Draw bounding box
+                cv2.rectangle(
+                    display_frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2
+                )
+
+                # Draw center point
+                cv2.circle(display_frame, (center_x, center_y), 5, (255, 0, 0), -1)
+
+                # Save the result
+                cv2.imwrite(output_path, display_frame)
+                print(f"✓ Segmentation result saved to {output_path}")
+
             return bbox
+
         return None
 
     # Function to run the scanning process
