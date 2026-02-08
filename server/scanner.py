@@ -177,8 +177,21 @@ class ObjectScanner:
         # Derive bounding box from mask
         y_idx, x_idx = np.where(mask_bool)
         if len(y_idx) > 0 and len(x_idx) > 0:
-            x_min, x_max = x_idx.min(), x_idx.max()
-            y_min, y_max = y_idx.min(), y_idx.max()
+            # Filter outliers: Keep only 90% of points closest to the centroid
+            points = np.column_stack((x_idx, y_idx))
+            centroid = points.mean(axis=0)
+            distances = np.linalg.norm(points - centroid, axis=1)
+            threshold = np.percentile(distances, 90)
+
+            filtered_points = points[distances <= threshold]
+
+            if len(filtered_points) > 0:
+                x_min, y_min = filtered_points.min(axis=0)
+                x_max, y_max = filtered_points.max(axis=0)
+            else:
+                x_min, x_max = x_idx.min(), x_idx.max()
+                y_min, y_max = y_idx.min(), y_idx.max()
+
             bbox = [int(x_min), int(y_min), int(x_max - x_min), int(y_max - y_min)]
 
             # Save visualization if requested
