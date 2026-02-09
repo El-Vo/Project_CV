@@ -7,3 +7,12 @@ reading/*
 **/.DS_Store
 docs/bs_studio/*
 faiss_db/*
+output_bbox.jpg
+remote_test.jpeg
+get_bbox_api.py
+.gitignore
+get_bbox_sam2.py
+**.png
+**.jpg
+**.jpeg
+
