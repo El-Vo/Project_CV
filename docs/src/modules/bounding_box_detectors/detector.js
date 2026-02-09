@@ -2,9 +2,7 @@ export class Detector {
   objectDetected = null;
 
   getCurrentDetection() {
-    const x = this.objectDetected;
-    this.objectDetected = null;
-    return x;
+    return this.objectDetected;
   }
 
   static getDefaultBoundingBox() {

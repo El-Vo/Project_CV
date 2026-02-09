@@ -4,6 +4,7 @@ import { CONFIG } from "./modules/config.js";
 import { PersonalObjectPicture } from "./modules/personalObjectPicture.js";
 import { DetectionLoop } from "./detectionLoop.js";
 import { TextToSpeech } from "./modules/tts.js";
+import { LabelValidator } from "./modules/labelValidator.js";
 
 export class ScanningLoop extends DetectionLoop {
   submitBtn = document.getElementById("submit-name-button");
@@ -20,13 +21,24 @@ export class ScanningLoop extends DetectionLoop {
 
     this.initializeUI();
 
-    TextToSpeech.speak("Starting scan mode for personal objects");
+    TextToSpeech.speak("Starting scan for personal objects");
   }
 
   initializeUI() {
-    this.submitBtn.addEventListener("click", () => {
+    this.submitBtn.addEventListener("click", async () => {
       const name = this.nameInput.value.trim();
       if (name) {
+        const exists = await LabelValidator.labelExists(name);
+        if (exists) {
+          alert(
+            `The object "${name}" already exists. Please choose a different name.`,
+          );
+          TextToSpeech.speak(
+            "This name is already taken. Please choose another one.",
+          );
+          return;
+        }
+
         this._objectLabel = name;
         document.getElementById("display-object-name").innerText = name;
         document.getElementById("enter-scan-name").classList.add("d-none");
@@ -57,8 +69,26 @@ export class ScanningLoop extends DetectionLoop {
   updateTracking() {
     const wasTracking = this._isTracking;
     super.updateTracking();
+    this._lastVotedDetection = this.detector.getCurrentDetection();
+    if (wasTracking && !this._isTracking) {
+      this.updateUIForScanning();
+      this.detector.initiateCenterDot();
+    }
     if (!wasTracking && this._isTracking) {
       this.updateUIForTracking();
+    }
+  }
+
+  updateUIForScanning() {
+    this.startTrackingBtn.innerText = "Start Object Tracking";
+    const instructions = document.getElementById("scan-instructions");
+    if (instructions) {
+      instructions.innerText =
+        "Point the blue square at the object and press the button.";
+    }
+    const countContainer = document.getElementById("photo-count-container");
+    if (countContainer) {
+      countContainer.classList.add("d-none");
     }
   }
 

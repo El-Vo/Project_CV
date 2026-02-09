@@ -52,19 +52,22 @@ class ObjectScanner:
             print(f"✓ Loaded existing database from {self.db_folder}")
             print(f"  - Total feature vectors: {self.index.ntotal}")
 
-            # Count unique objects and their perspectives
-            unique_objects = set(self.id_to_name)
-            print(f"  - Unique objects: {len(unique_objects)}")
+            summary = self.get_object_summary()
+            print(f"  - Unique objects: {len(summary)}")
 
             # Show details for each object
-            for obj in unique_objects:
-                count = self.id_to_name.count(obj)
+            for obj, count in summary.items():
                 print(f"    • '{obj}': {count} perspective{'s' if count != 1 else ''}")
         else:
             # Create new database
             self.index = faiss.IndexFlatL2(self.dimension)
             self.id_to_name = []
             print(f"✓ Created new empty database (will save to {self.db_folder})")
+
+    def get_object_summary(self):
+        """Returns a dictionary of unique objects and their perspective counts."""
+        unique_objects = sorted(list(set(self.id_to_name)))
+        return {obj: self.id_to_name.count(obj) for obj in unique_objects}
 
     # Function to save FAISS index and mapping in json
     def save_to_database(self):
@@ -74,12 +77,36 @@ class ObjectScanner:
             json.dump(self.id_to_name, f, indent=4)
 
         print(f"✓ Database saved to {self.db_folder}")
-        unique_objects = set(self.id_to_name)
+        summary = self.get_object_summary()
         print(f"  - Total feature vectors: {self.index.ntotal}")
-        print(f"  - Unique objects: {len(unique_objects)}")
-        for obj in unique_objects:
-            count = self.id_to_name.count(obj)
+        print(f"  - Unique objects: {len(summary)}")
+        for obj, count in summary.items():
             print(f"    • '{obj}': {count} perspective{'s' if count != 1 else ''}")
+
+    def delete_object(self, label):
+        """Removes all perspectives of an object from the database."""
+        indices_to_keep = [i for i, name in enumerate(self.id_to_name) if name != label]
+
+        if len(indices_to_keep) == len(self.id_to_name):
+            print(f"⚠ Object '{label}' not found in database.")
+            return False
+
+        # Rebuild index to ensure consistency
+        new_index = faiss.IndexFlatL2(self.dimension)
+        if indices_to_keep:
+            # Extract all vectors we want to keep
+            vectors = []
+            for i in indices_to_keep:
+                vectors.append(self.index.reconstruct(i))
+            vectors = np.array(vectors).astype("float32")
+            new_index.add(vectors)
+
+        self.index = new_index
+        self.id_to_name = [self.id_to_name[i] for i in indices_to_keep]
+
+        print(f"✓ Deleted all entries for object '{label}'")
+        self.save_to_database()
+        return True
 
     # Function to process frame, extract object and store features and object name in FAISS
     def process_and_store(self, frame, bbox, label):
@@ -119,13 +146,22 @@ class ObjectScanner:
         self.id_to_name.append(label)
         return True
 
-    def get_bounding_box_from_sam(self, frame, center_x, center_y):
+    def get_bounding_box_from_sam(
+        self,
+        frame,
+        center_x,
+        center_y,
+        save_result=True,
+        output_path="segmentation_result.png",
+    ):
         """Use SAM to segment object at center point and derive bounding box.
 
         Args:
             frame: Input video frame (BGR)
             center_x: X coordinate of center point
             center_y: Y coordinate of center point
+            save_result: Whether to save visualization (default: False)
+            output_path: Path to save the result image (default: "segmentation_result.png")
 
         Returns:
             Tuple (x, y, w, h) or None if segmentation fails
@@ -141,10 +177,46 @@ class ObjectScanner:
         # Derive bounding box from mask
         y_idx, x_idx = np.where(mask_bool)
         if len(y_idx) > 0 and len(x_idx) > 0:
-            x_min, x_max = x_idx.min(), x_idx.max()
-            y_min, y_max = y_idx.min(), y_idx.max()
+            # Filter outliers: Keep only 90% of points closest to the centroid
+            points = np.column_stack((x_idx, y_idx))
+            centroid = points.mean(axis=0)
+            distances = np.linalg.norm(points - centroid, axis=1)
+            threshold = np.percentile(distances, 90)
+
+            filtered_points = points[distances <= threshold]
+
+            if len(filtered_points) > 0:
+                x_min, y_min = filtered_points.min(axis=0)
+                x_max, y_max = filtered_points.max(axis=0)
+            else:
+                x_min, x_max = x_idx.min(), x_idx.max()
+                y_min, y_max = y_idx.min(), y_idx.max()
+
             bbox = [int(x_min), int(y_min), int(x_max - x_min), int(y_max - y_min)]
+
+            # Save visualization if requested
+            if save_result:
+                display_frame = frame.copy()
+
+                # Overlay the mask with semi-transparent green
+                overlay = display_frame.copy()
+                overlay[mask_bool] = [0, 255, 0]  # Green color (BGR)
+                display_frame = cv2.addWeighted(display_frame, 0.7, overlay, 0.3, 0)
+
+                # Draw bounding box
+                cv2.rectangle(
+                    display_frame, (x_min, y_min), (x_max, y_max), (0, 255, 0), 2
+                )
+
+                # Draw center point
+                cv2.circle(display_frame, (center_x, center_y), 5, (255, 0, 0), -1)
+
+                # Save the result
+                cv2.imwrite(output_path, display_frame)
+                print(f"✓ Segmentation result saved to {output_path}")
+
             return bbox
+
         return None
 
     # Function to run the scanning process

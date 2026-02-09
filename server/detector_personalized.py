@@ -92,7 +92,7 @@ class ObjectRecognizer:
         return feat.cpu().numpy().astype("float32")
 
     # Given a mask, extract object and identify using FAISS, return best match, avg score, bbox
-    def identify_object(self, frame, mask):
+    def identify_object(self, frame, mask, target_label):
         # Get bounding box from mask
         ys, xs = np.where(mask)
         if len(xs) == 0 or len(ys) == 0:
@@ -118,32 +118,41 @@ class ObjectRecognizer:
         # Extract features
         candidate_feat = self.extract_dino_features(crop)
 
-        # Search FAISS for the closest neighbor
-        distances, indices = self.index.search(candidate_feat, 1)
+        # Search FAISS for the closest neighbors to find the target object
+        k = 10
+        distances, indices = self.index.search(candidate_feat, k)
 
-        # FAISS returns arrays, get the first values
-        dist = distances[0][0]
-        idx = indices[0][0]
+        best_sim = -1
+        best_idx = -1
 
-        # Convert L2 distance to Similarity (0 to 1 scale)
-        # L2 distance is the straight-line distance between vectors
-        similarity = 1.0 / (1.0 + dist)
+        for i in range(len(indices[0])):
+            idx = indices[0][i]
+            if idx == -1:
+                continue
 
-        # Return nothing if below threshold
-        if similarity < self.SIM_THRESHOLD:
+            obj_name = str(self.id_to_name[idx])
+            if obj_name == target_label:
+                dist = distances[0][i]
+                similarity = 1.0 / (1.0 + dist)
+                if similarity > best_sim:
+                    best_sim = similarity
+                    best_idx = idx
+
+        # Return nothing if no match found or below threshold
+        if best_idx == -1 or best_sim < self.SIM_THRESHOLD:
             return None
 
         # Return the match
-        obj_name = str(self.id_to_name[idx])
         return {
-            "label": obj_name,
-            "score": float(similarity),
+            "label": str(self.id_to_name[best_idx]),
+            "score": float(best_sim),
             "box": [int(x1), int(y1), int(w), int(h)],
         }
 
     # Run FastSAM + FAISS identification on current frame, this cycle needs to be called periodically
-    def run_identification_cycle(self, frame):
-        print("\nRunning FastSAM + FAISS identification...")
+    def run_identification_cycle(self, frame, target_label):
+        print(f"\nSearching for '{target_label}' using FastSAM + FAISS...")
+
         total_start = time.time()  # delete later
 
         # Run FastSAM to segment all objects in the frame
@@ -169,7 +178,7 @@ class ObjectRecognizer:
             mask = masks_tensor[i].detach().cpu().numpy().astype(bool)
 
             # Calls identify_object to check this mask
-            result = self.identify_object(frame, mask)
+            result = self.identify_object(frame, mask, target_label)
 
             # Update the best match if the result is bigger than threshold and more confident than previous best
             if result and result["score"] > best_score:
@@ -186,7 +195,7 @@ class ObjectRecognizer:
                 f"  Best match: '{best_match['label']}' (score={best_match['score']:.3f})"
             )
         else:  # otherwise no match found, run id cycle again later
-            print(f"  No confident match found")
+            print(f"  No match found for '{target_label}'")
 
         return best_match
 

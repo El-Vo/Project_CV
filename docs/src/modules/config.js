@@ -1,5 +1,5 @@
 export const CONFIG = {
-  API_URL: "http://localhost:8000",
+  API_URL: "http://127.0.0.1:8000",
   GENERIC_DETECTION_PATH: "/detect",
   PERSONALIZED_DETECTION_PATH: "/detect_personalized",
   GET_BBOX_PATH: "/get_bounding_box_from_coord",
@@ -8,7 +8,7 @@ export const CONFIG = {
   DEPTH_WIDTH: 112,
   DEPTH_HEIGHT: 112,
   DEPTH_FPS_TARGET: 10,
-  DETECTION_FPS_TARGET: 1,
+  DETECTION_FPS_TARGET: 2,
   DETECTION_SHORT_SIDE_PX: 480,
   AUDIO_BEEP_FREQ: 800,
   AUDIO_MIN_DELAY: 100,

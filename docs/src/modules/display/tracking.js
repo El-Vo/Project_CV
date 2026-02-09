@@ -12,6 +12,7 @@ export class FeatureTracker extends CanvasManager2d {
     // OpenCV Mats for Optical Flow
     this.prevGray = null;
     this.prevPoints = null;
+    this.initialPointCount = 0;
 
     // Constants
     this.winSize = null;
@@ -59,6 +60,7 @@ export class FeatureTracker extends CanvasManager2d {
       if (this.prevPoints.rows > 5) {
         this.currentBox = [x1, y1, x2, y2];
         this.isInitialized = true;
+        this.initialPointCount = this.prevPoints.rows;
         this.winSize = new cv.Size(15, 15);
         this.criteria = new cv.TermCriteria(
           cv.TermCriteria_COUNT + cv.TermCriteria_EPS,
@@ -78,15 +80,21 @@ export class FeatureTracker extends CanvasManager2d {
    */
   track(camera_canvas) {
     if (!this.prevPoints || this.prevPoints.rows === 0) return null;
+    let frame = null;
+    let nextGray = null;
+    let nextPoints = null;
+    let status = null;
+    let err = null;
+    let goodNextPoints = null;
 
     try {
-      let frame = cv.imread(camera_canvas);
-      let nextGray = new cv.Mat();
+      frame = cv.imread(camera_canvas);
+      nextGray = new cv.Mat();
       cv.cvtColor(frame, nextGray, cv.COLOR_RGBA2GRAY);
 
-      let nextPoints = new cv.Mat();
-      let status = new cv.Mat();
-      let err = new cv.Mat();
+      nextPoints = new cv.Mat();
+      status = new cv.Mat();
+      err = new cv.Mat();
 
       cv.calcOpticalFlowPyrLK(
         this.prevGray,
@@ -122,11 +130,6 @@ export class FeatureTracker extends CanvasManager2d {
       }
 
       if (validCount < 5) {
-        nextGray.delete();
-        nextPoints.delete();
-        status.delete();
-        err.delete();
-        frame.delete();
         return null;
       }
 
@@ -146,23 +149,14 @@ export class FeatureTracker extends CanvasManager2d {
       const cx = (x1 + x2) / 2;
       const cy = (y1 + y2) / 2;
       if (cx < 0 || cy < 0 || cx > frame.cols || cy > frame.rows) {
-        nextGray.delete();
-        nextPoints.delete();
-        status.delete();
-        err.delete();
-        frame.delete();
         console.log(
           "Tracking box center left visible area, triggering reset...",
         );
         return null;
       }
 
-      // Prepare for next frame
-      this.prevGray.delete();
-      this.prevGray = nextGray;
-      this.prevPoints.delete();
       // Filter points for next frame (only keep successful ones)
-      let goodNextPoints = new cv.Mat(validCount, 1, cv.CV_32FC2);
+      goodNextPoints = new cv.Mat(validCount, 1, cv.CV_32FC2);
       let gIdx = 0;
       for (let i = 0; i < status.rows; i++) {
         if (pointStatus[i]) {
@@ -171,21 +165,33 @@ export class FeatureTracker extends CanvasManager2d {
           gIdx++;
         }
       }
-      this.prevPoints = goodNextPoints;
 
-      status.delete();
-      err.delete();
-      frame.delete();
-      nextPoints.delete();
+      // Prepare for next frame
+      // Swap globals
+      if (this.prevGray) this.prevGray.delete();
+      this.prevGray = nextGray;
+      nextGray = null; // Prevent cleanup in finally
+
+      if (this.prevPoints) this.prevPoints.delete();
+      this.prevPoints = goodNextPoints;
+      goodNextPoints = null; // Prevent cleanup in finally
 
       let detection = Detector.getDefaultBoundingBox();
       detection.box = this.currentBox;
-      detection.score = validCount / 50;
+      // Normalize score based on initial count
+      detection.score = validCount / (this.initialPointCount || 50);
 
       return detection;
     } catch (err) {
       console.error("Tracking Update Error:", err);
       return null;
+    } finally {
+      if (frame) frame.delete();
+      if (nextGray) nextGray.delete();
+      if (nextPoints) nextPoints.delete();
+      if (status) status.delete();
+      if (err) err.delete();
+      if (goodNextPoints) goodNextPoints.delete();
     }
   }
 }

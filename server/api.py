@@ -37,7 +37,9 @@ async def detect_generic_object(prompt: str = Form(...), file: UploadFile = File
 
 
 @app.post("/detect_personalized")
-async def detect_personalized_object(file: UploadFile = File(...)):
+async def detect_personalized_object(
+    file: UploadFile = File(...), label: str = Form(...)
+):
     contents = await file.read()
     image_pil = Image.open(io.BytesIO(contents))
 
@@ -45,7 +47,7 @@ async def detect_personalized_object(file: UploadFile = File(...)):
     image_np = np.array(image_pil)
     image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
 
-    detection = personalized_detector.run_identification_cycle(image_bgr)
+    detection = personalized_detector.run_identification_cycle(image_bgr, label)
     return {"detection": detection}
 
 
@@ -59,7 +61,19 @@ async def get_bounding_box(
     image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
 
     bounding_box = object_scanner.get_bounding_box_from_sam(image_bgr, x, y)
+    if bounding_box:
+        # Convert from [x, y, w, h] to [x1, y1, x2, y2]
+        x1, y1, w, h = bounding_box
+        bounding_box = [x1, y1, x1 + w, y1 + h]
+
     return {"bounding_box": bounding_box}
+
+
+@app.get("/get_personal_object_labels")
+async def get_personal_object_labels():
+    summary = object_scanner.get_object_summary()
+    labels = list(summary.keys())
+    return {"labels": labels, "summary": summary}
 
 
 @app.post("/save_to_faiss")
@@ -88,5 +102,17 @@ async def save_to_faiss(
     success = object_scanner.process_and_store(image_bgr, bbox_list, label)
     if success:
         object_scanner.save_to_database()
+        # Refresh the personalized detector's database
+        personalized_detector._load_database()
+
+    return {"success": success}
+
+
+@app.post("/delete_personal_object")
+async def delete_personal_object(label: str = Form(...)):
+    success = object_scanner.delete_object(label)
+    if success:
+        # Refresh the personalized detector's database to reflect changes
+        personalized_detector._load_database()
 
     return {"success": success}

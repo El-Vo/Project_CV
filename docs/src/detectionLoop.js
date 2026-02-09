@@ -4,6 +4,7 @@ import { FeatureTracker } from "./modules/display/tracking.js";
 import { DepthEstimator } from "./modules/depth.js";
 import { ParkingSensor } from "./modules/audio.js";
 import { DepthUIController } from "./modules/display/depthUI.js";
+import { Detector } from "./modules/bounding_box_detectors/detector.js";
 
 export class DetectionLoop {
   _lastDetectionTimestamp = 0;
@@ -13,8 +14,12 @@ export class DetectionLoop {
   _isDetecting = false;
   _isTracking = false;
   _isDepthEstimating = false;
-  _CurrentObjectCenter = { x: 0, y: 0 };
+  _CurrentBoundingBox = null;
   _objectLabel = null;
+  _currentAvgDepth = 0;
+  _lastDetectionArea = 0;
+  _lastDetectionDepth = 0;
+  _lastVotedDetection = null;
 
   depthCanvas = document.getElementById("depth-canvas");
   detectionCanvas = document.getElementById("detection-canvas");
@@ -60,20 +65,17 @@ export class DetectionLoop {
       console.error("Detection error:", err);
     } finally {
       this._isDetecting = false;
-      const prompt = UI.getTextPrompt();
-      TextToSpeech.speak(`Found ${prompt}`);
     }
   }
 
   updateTracking() {
     let detection = this.detector.getCurrentDetection();
 
-    if (detection != null && detection.box) {
+    if (detection && detection.box && detection !== this._lastVotedDetection) {
       this._isTracking = this.tracker.init(
         this.camera.takePictureResized(false),
         detection.box,
       );
-      if (this.sensor) this.sensor.start();
     }
 
     if (this._isTracking) {
@@ -83,12 +85,14 @@ export class DetectionLoop {
         this._isTracking = false;
         this._countOfSuccessfulTrackingiterations = 0;
         this.tracker.clearCanvas();
-        if (this.sensor) this.sensor.stop();
+        if (this.depthUI) {
+          this.depthUI.clearCanvas();
+        }
       } else {
         // Scale back up from resized coordinates to full picture coordinates
         detection.box = this.camera.scaleBoundingBoxFromResized(detection.box);
 
-        this.updateObjectCenter(detection.box);
+        this._CurrentBoundingBox = detection.box;
 
         detection.box = this.camera.translateBoundingBoxToWindowScaling(
           detection.box,
@@ -98,18 +102,30 @@ export class DetectionLoop {
           detection.label = this._objectLabel;
         }
 
-        this.tracker.drawDetection(detection);
+        this.tracker.drawRectangle(detection.box);
 
         this._countOfSuccessfulTrackingiterations++;
       }
     }
+  }
 
-    if (
-      this._countOfSuccessfulTrackingiterations > this._maxTrackingIterations
-    ) {
-      this._isTracking = false;
-      this._countOfSuccessfulTrackingiterations = 0;
-      if (this.sensor) this.sensor.stop();
+  updateSensor() {
+    if (!this.sensor) return;
+
+    if (this._isTracking) {
+      this.sensor.start();
+
+      const detection = this.detector.getCurrentDetection();
+      if (
+        detection &&
+        detection.box &&
+        detection !== this._lastVotedDetection
+      ) {
+        this.voteOnSensorStage(detection.box);
+        this._lastVotedDetection = detection;
+      }
+    } else {
+      this.sensor.stop();
     }
   }
 
@@ -124,25 +140,17 @@ export class DetectionLoop {
       this.depthUI.setDepthPrediction(depthPrediction);
       this.depthUI.updateDepthCanvas();
       //Scale objectPosition based on raw camera input to depth map resoulution
-      const depthObjectCenter = {
-        x: this.depth.scaleRawCameraToDepthX(this._CurrentObjectCenter.x),
-        y: this.depth.scaleRawCameraToDepthY(this._CurrentObjectCenter.y),
-      };
-      const obj_depth = this.depthUI.updateDepthOfObject(depthObjectCenter);
-      if (this.sensor) this.sensor.update(obj_depth);
+      const obj_depth = this.depthUI.updateDepthOfObject(
+        this._CurrentBoundingBox,
+        this.depth,
+      );
+      this._currentAvgDepth = obj_depth;
+      // if (this.sensor) this.sensor.update(obj_depth);
     } catch (err) {
       console.error("Depth estimation error:", err);
     } finally {
       this._isDepthEstimating = false;
     }
-  }
-
-  updateObjectCenter(box) {
-    let [x1, y1, x2, y2] = box;
-    this._CurrentObjectCenter = {
-      x: (x2 - x1) / 2,
-      y: (y2 - y1) / 2,
-    };
   }
 
   updateCanvasDimensions() {
@@ -155,5 +163,61 @@ export class DetectionLoop {
       window.innerWidth,
       window.innerHeight,
     );
+  }
+
+  voteOnSensorStage(newBox) {
+    if (!this.sensor || !newBox) return;
+
+    // Calculate area of new box (format: [x1, y1, x2, y2])
+    const [x1, y1, x2, y2] = newBox;
+    const w = x2 - x1;
+    const h = y2 - y1;
+    const currentArea = w * h;
+    const currentDepth = this._currentAvgDepth; // Uses the latest available depth
+
+    // Calculate total possible area based on resized detection image size
+    const { width: vrW, height: vrH } = this.camera.visibleRegion;
+    const isPortrait = vrW < vrH;
+    const shortSide = CONFIG.DETECTION_SHORT_SIDE_PX;
+    const targetWidth = isPortrait ? shortSide : (vrW / vrH) * shortSide;
+    const targetHeight = isPortrait ? (vrH / vrW) * shortSide : shortSide;
+    const totalArea = targetWidth * targetHeight;
+
+    // Check for "extremely close" condition: distance > 60 and area > 50% of viewport
+    if (currentDepth > 60 && currentArea > totalArea / 2) {
+      this.sensor.currentStage = 5;
+      console.log("Maximum stage reached: Object very close and large");
+      this._lastDetectionArea = currentArea;
+      this._lastDetectionDepth = currentDepth;
+      return;
+    }
+
+    // First run initialization
+    if (this._lastDetectionArea === 0) {
+      this._lastDetectionArea = currentArea;
+      this._lastDetectionDepth = currentDepth;
+      return;
+    }
+
+    // Logic for Increasing Stage (Closer)
+    if (
+      currentArea >= this._lastDetectionArea * 1.1 &&
+      currentDepth >= this._lastDetectionDepth + 10
+    ) {
+      this.sensor.increaseStage();
+      console.log("increasing stage of parking sensor");
+    }
+    // Logic for Decreasing Stage (Farther)
+    else if (
+      currentArea <= this._lastDetectionArea * 0.9 &&
+      currentDepth <= this._lastDetectionDepth - 10
+    ) {
+      this.sensor.decreaseStage();
+      console.log("decreasing stage of parking sensor");
+    }
+
+    // Update references
+    this._lastDetectionArea = currentArea;
+    this._lastDetectionDepth = currentDepth;
   }
 }

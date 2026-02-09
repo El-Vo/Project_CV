@@ -211,4 +211,17 @@ export class CameraHandler extends CanvasManager2d {
       return this.canvas;
     }
   }
+
+  takeRawPicture(return_blob = true) {
+    this.canvas.width = this.video.videoWidth;
+    this.canvas.height = this.video.videoHeight;
+
+    this.ctx.drawImage(this.video, 0, 0);
+
+    if (return_blob) {
+      return this.turnPictureCanvasToBlob();
+    } else {
+      return this.canvas;
+    }
+  }
 }

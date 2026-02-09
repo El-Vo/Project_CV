@@ -29,20 +29,7 @@ Minimal local prototype for open-vocabulary object finding using YOLO-World.
 
 ## Usage
 
-### 1. Command Line MVP (OpenCV Window)
-
-Use the helper script for a quick local validation:
-
-- **Webcam**:
-  ```bash
-  python scripts/run_mvp.py --prompt "red candle" --source 0
-  ```
-- **Image**:
-  ```bash
-  python scripts/run_mvp.py --prompt "wine bottle" --source Test_images/table.JPG
-  ```
-
-### 2. Web App MVP (Browser Interface)
+### Web App MVP (Browser Interface)
 
 For the interactive browser interface with real-time overlay:
 
@@ -63,22 +50,21 @@ For the interactive browser interface with real-time overlay:
    ```
 
 3. **Open in Browser**:
-   Navigate to `http://localhost:8081` to use the app.
+   Navigate to `http://127.0.0.1:8081` to use the app.
 
-4. **Mobile Testing (Android)**:
-   If you are developing on a laptop and have an Android device connected via USB:
-   ```bash
-   adb reverse tcp:8000 tcp:8000
-   ```
-   Then open `http://localhost:8000` in the Chrome browser on your phone.
+### Remote Testing on Android (Chrome)
 
-## Performance Tuning
+To test the application on an Android device with full camera access (requires a "Secure Context"), it is recommended to use **USB Port Forwarding**:
 
-- **Latency**: Reduce `--display-width` in the detector or capture resolution to speed up inference on weak GPUs/CPUs.
-- **Stability**: The web app includes a movement threshold to pause processing when the object is stable, saving battery and CPU.
-- **FPS**: Lower the camera resolution and `--max-det` if you experience low frame rates.
-
-## Notes
-
-- Guidance is based on simple bounding box heuristics (area and center-x).
-- For custom prompts, the model might take a second to re-initialize classes on the first frame.
+1.  **Preparation**:
+    - Enable **USB Debugging** on your Android device (Settings > About Phone > Tap 'Build Number' 7 times > Developer Options).
+    - Connect your device to your computer via USB.
+2.  **Start Services**: Ensure both the backend (Port 8000) and frontend (Port 8081) are running on your computer.
+3.  **Chrome Port Forwarding**:
+    - Open `chrome://inspect/#devices` in Chrome on your computer.
+    - Click **Port forwarding...**.
+    - Add rules:
+      - `8081` -> `127.0.0.1:8081`
+      - `8000` -> `127.0.0.1:8000`
+    - Check **Enable port forwarding** and click **Done**.
+4.  **Access**: Open Chrome on your Android device and navigate to `http://127.0.0.1:8081`.
