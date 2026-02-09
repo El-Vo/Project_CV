@@ -1,6 +1,33 @@
 import { CONFIG } from "./config.js";
 export class TextToSpeech {
-  static _initialized = false;
+  static _initialized = navigator.userActivation?.hasBeenActive || false;
+  static _queue = [];
+
+  static init() {
+    if (this._initialized) return;
+
+    const unlock = () => {
+      if (this._initialized) return;
+
+      // Speak a silent empty utterance to "unlock" the API
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance("");
+      window.speechSynthesis.speak(utterance);
+
+      this._initialized = true;
+      console.log("TTS unlocked by user gesture");
+
+      // Process any queued messages
+      while (this._queue.length > 0) {
+        const item = this._queue.shift();
+        this.speak(item.text, item.lang);
+      }
+    };
+
+    document.addEventListener("click", unlock, { once: true });
+    document.addEventListener("touchstart", unlock, { once: true });
+    document.addEventListener("keydown", unlock, { once: true });
+  }
 
   static async getBestVoice(lang = "en-US") {
     let voices = window.speechSynthesis.getVoices();
@@ -44,6 +71,12 @@ export class TextToSpeech {
       return;
     }
 
+    if (!this._initialized) {
+      console.warn("TTS called before user activation. Queuing message:", text);
+      this._queue.push({ text, lang });
+      return;
+    }
+
     const bestVoice = await this.getBestVoice(lang);
 
     // Cancel any ongoing speech
@@ -60,3 +93,6 @@ export class TextToSpeech {
     window.speechSynthesis.speak(utterance);
   }
 }
+
+// Initialize listeners on load
+TextToSpeech.init();
