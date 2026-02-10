@@ -29,15 +29,15 @@ export class UIFeedback {
       const gainNode = ctx.createGain();
 
       const now = ctx.currentTime;
-      const duration = 0.15; // Kürzerer, prägnanterer Ton
+      const duration = 0.15; // Short, noticeable tone
 
       oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(880, now); // A5 Note für einen klaren Ton
+      oscillator.frequency.setValueAtTime(880, now); // A5 note for clear sound
 
-      // Knacken verhindern durch sanftes Ein/Ausblenden (Attack/Release)
+      // Prevent cracking through easing the sound in and out
       gainNode.gain.setValueAtTime(0, now);
-      gainNode.gain.linearRampToValueAtTime(0.2, now + 0.01); // Schneller Anstieg
-      gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration); // Sanftes Ausklingen
+      gainNode.gain.linearRampToValueAtTime(0.2, now + 0.01); // Fast rise
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration); // Smooth falloff.
 
       oscillator.connect(gainNode);
       gainNode.connect(ctx.destination);
