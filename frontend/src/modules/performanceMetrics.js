@@ -44,7 +44,7 @@ export class PerformanceMetrics {
       const now = performance.now();
       // "End: Bounding Box drawn" -> Search Time end.
       const searchDuration = (now - this.sessionState.searchStartTime) / 1000;
-      this.metrics.searchTime = searchDuration; // Store last search time? or average? "Search Time (s)" implies likely the current one.
+      this.metrics.searchTime = searchDuration;
 
       this.sessionState.isSearching = false;
       this.sessionState.isGuiding = true;
