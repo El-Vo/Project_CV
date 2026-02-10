@@ -1,14 +1,4 @@
-# CV Project MVP
-
-Minimal local prototype for open-vocabulary object finding using YOLO-World.
-
-## Features
-
-- **Open-Vocabulary Detection**: Detect anything by typing a prompt, powered by `yolov8s-world.pt`.
-- **Hybrid Support**: Works with webcams, video streams, or static images.
-- **On-Frame Guidance**: Provides real-time feedback (left/center/right and near/medium/far) for the best match.
-- **Web Interface**: Modern browser-based UI for mobile and desktop testing.
-
+# See Everything
 ## Setup
 
 1. **Environment (Optional)**: Highly recommended to use a virtual environment (`venv` or `conda`).
